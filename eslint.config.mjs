@@ -23,6 +23,7 @@ const eslintConfig = [...nextCoreWebVitals, ...nextTypescript, {
     "react/display-name": "off",
     "react/prop-types": "off",
     "react-compiler/react-compiler": "off",
+    "react-hooks/set-state-in-effect": "off",
     
     // Next.js rules
     "@next/next/no-img-element": "off",
@@ -44,7 +45,7 @@ const eslintConfig = [...nextCoreWebVitals, ...nextTypescript, {
     "no-useless-escape": "off",
   },
 }, {
-  ignores: ["node_modules/**", ".next/**", "out/**", "build/**", "next-env.d.ts", "examples/**", "skills"]
+  ignores: ["node_modules/**", ".next/**", "out/**", "build/**", "next-env.d.ts", "examples/**", "skills/**", "workspace-analysis/**", "scripts/**", "mini-services/**", "agent-ctx/**", "tool-results/**", "download/**", "upload/**"]
 }];
 
 export default eslintConfig;

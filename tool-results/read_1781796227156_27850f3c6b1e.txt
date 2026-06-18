@@ -1,0 +1,1300 @@
+     1→"use client";
+     2→
+     3→import { useState, useEffect, useCallback } from "react";
+     4→import { motion, AnimatePresence } from "framer-motion";
+     5→import {
+     6→  Calendar,
+     7→  Users,
+     8→  DollarSign,
+     9→  Mail,
+    10→  Clock,
+    11→  Eye,
+    12→  Star,
+    13→  ChevronDown,
+    14→  RefreshCw,
+    15→  ArrowUpRight,
+    16→  TrendingUp,
+    17→  AlertCircle,
+    18→  CheckCircle2,
+    19→  XCircle,
+    20→  Hourglass,
+    21→  ExternalLink,
+    22→  Search,
+    23→  Trash2,
+    24→} from "lucide-react";
+    25→
+    26→import {
+    27→  Card,
+    28→  CardContent,
+    29→  CardDescription,
+    30→  CardHeader,
+    31→  CardTitle,
+    32→} from "@/components/ui/card";
+    33→import { Button } from "@/components/ui/button";
+    34→import { Badge } from "@/components/ui/badge";
+    35→import {
+    36→  Table,
+    37→  TableBody,
+    38→  TableCell,
+    39→  TableHead,
+    40→  TableHeader,
+    41→  TableRow,
+    42→} from "@/components/ui/table";
+    43→import {
+    44→  Select,
+    45→  SelectContent,
+    46→  SelectItem,
+    47→  SelectTrigger,
+    48→  SelectValue,
+    49→} from "@/components/ui/select";
+    50→import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+    51→import { Skeleton } from "@/components/ui/skeleton";
+    52→import { Input } from "@/components/ui/input";
+    53→
+    54→// ─── Types ────────────────────────────────────────────────────────
+    55→
+    56→interface DashboardStats {
+    57→  totalBookings: number;
+    58→  pendingBookings: number;
+    59→  confirmedBookings: number;
+    60→  completedBookings: number;
+    61→  cancelledBookings: number;
+    62→  totalNewsletter: number;
+    63→  totalMicroReadings: number;
+    64→  totalReferrals: number;
+    65→  totalMemberships: number;
+    66→  totalTestimonials: number;
+    67→  totalInsights: number;
+    68→  totalRevenue: number;
+    69→  recentBookings: number;
+    70→  recentNewsletter: number;
+    71→}
+    72→
+    73→interface Booking {
+    74→  id: string;
+    75→  name: string;
+    76→  email: string;
+    77→  phone: string | null;
+    78→  duration: number;
+    79→  price: string;
+    80→  contexts: string;
+    81→  birthDate: string | null;
+    82→  birthTime: string | null;
+    83→  birthPlace: string | null;
+    84→  message: string | null;
+    85→  status: string;
+    86→  referredBy: string | null;
+    87→  createdAt: string;
+    88→  updatedAt: string;
+    89→}
+    90→
+    91→interface NewsletterSub {
+    92→  id: string;
+    93→  email: string;
+    94→  source: string | null;
+    95→  createdAt: string;
+    96→}
+    97→
+    98→interface MicroReadingLead {
+    99→  id: string;
+   100→  email: string;
+   101→  birthMonth: number;
+   102→  emotionalPattern: string;
+   103→  relationshipFrustration: string;
+   104→  resultHint: string;
+   105→  createdAt: string;
+   106→}
+   107→
+   108→// ─── Status Config ────────────────────────────────────────────────
+   109→
+   110→const STATUS_CONFIG: Record<
+   111→  string,
+   112→  { label: string; color: string; bgColor: string; borderColor: string; icon: React.ReactNode }
+   113→> = {
+   114→  pending: {
+   115→    label: "Pending",
+   116→    color: "text-yellow-400",
+   117→    bgColor: "bg-yellow-400/10",
+   118→    borderColor: "border-yellow-400/20",
+   119→    icon: <Hourglass className="size-3" />,
+   120→  },
+   121→  confirmed: {
+   122→    label: "Confirmed",
+   123→    color: "text-[#c9a96e]",
+   124→    bgColor: "bg-[#c9a96e]/10",
+   125→    borderColor: "border-[#c9a96e]/20",
+   126→    icon: <CheckCircle2 className="size-3" />,
+   127→  },
+   128→  completed: {
+   129→    label: "Completed",
+   130→    color: "text-emerald-400",
+   131→    bgColor: "bg-emerald-400/10",
+   132→    borderColor: "border-emerald-400/20",
+   133→    icon: <CheckCircle2 className="size-3" />,
+   134→  },
+   135→  cancelled: {
+   136→    label: "Cancelled",
+   137→    color: "text-[#c0392b]",
+   138→    bgColor: "bg-[#c0392b]/10",
+   139→    borderColor: "border-[#c0392b]/20",
+   140→    icon: <XCircle className="size-3" />,
+   141→  },
+   142→};
+   143→
+   144→const MONTH_NAMES = [
+   145→  "January", "February", "March", "April", "May", "June",
+   146→  "July", "August", "September", "October", "November", "December",
+   147→];
+   148→
+   149→// ─── Helpers ──────────────────────────────────────────────────────
+   150→
+   151→function formatDate(dateStr: string) {
+   152→  try {
+   153→    return new Date(dateStr).toLocaleDateString("en-IN", {
+   154→      day: "2-digit",
+   155→      month: "short",
+   156→      year: "numeric",
+   157→    });
+   158→  } catch {
+   159→    return dateStr;
+   160→  }
+   161→}
+   162→
+   163→function formatDateTime(dateStr: string) {
+   164→  try {
+   165→    return new Date(dateStr).toLocaleString("en-IN", {
+   166→      day: "2-digit",
+   167→      month: "short",
+   168→      year: "numeric",
+   169→      hour: "2-digit",
+   170→      minute: "2-digit",
+   171→    });
+   172→  } catch {
+   173→    return dateStr;
+   174→  }
+   175→}
+   176→
+   177→function formatPrice(price: string) {
+   178→  const num = parseFloat(price.replace(/[^0-9.]/g, ""));
+   179→  if (isNaN(num)) return price;
+   180→  return "₹" + num.toLocaleString("en-IN");
+   181→}
+   182→
+   183→// ─── Stat Card Component ──────────────────────────────────────────
+   184→
+   185→function StatCard({
+   186→  title,
+   187→  value,
+   188→  subtitle,
+   189→  icon,
+   190→  accent,
+   191→  delay = 0,
+   192→}: {
+   193→  title: string;
+   194→  value: string | number;
+   195→  subtitle?: string;
+   196→  icon: React.ReactNode;
+   197→  accent: string;
+   198→  delay?: number;
+   199→}) {
+   200→  return (
+   201→    <motion.div
+   202→      initial={{ opacity: 0, y: 20 }}
+   203→      animate={{ opacity: 1, y: 0 }}
+   204→      transition={{ duration: 0.5, delay, ease: [0.25, 0.46, 0.45, 0.94] }}
+   205→    >
+   206→      <Card className="card-depth bg-[#0a0a0a] border-white/[0.04] hover:border-white/[0.08] transition-all duration-500">
+   207→        <CardContent className="p-6">
+   208→          <div className="flex items-start justify-between">
+   209→            <div className="space-y-2">
+   210→              <p className="text-body-cinematic text-xs uppercase tracking-[0.2em]">
+   211→                {title}
+   212→              </p>
+   213→              <p className="text-editorial text-2xl sm:text-3xl text-[#f0eee9]">
+   214→                {value}
+   215→              </p>
+   216→              {subtitle && (
+   217→                <p className="text-body-cinematic text-xs flex items-center gap-1">
+   218→                  <TrendingUp className="size-3 text-emerald-400" />
+   219→                  {subtitle}
+   220→                </p>
+   221→              )}
+   222→            </div>
+   223→            <div
+   224→              className={`rounded-lg p-3 ${accent}`}
+   225→            >
+   226→              {icon}
+   227→            </div>
+   228→          </div>
+   229→        </CardContent>
+   230→      </Card>
+   231→    </motion.div>
+   232→  );
+   233→}
+   234→
+   235→// ─── Status Badge ─────────────────────────────────────────────────
+   236→
+   237→function StatusBadge({ status }: { status: string }) {
+   238→  const config = STATUS_CONFIG[status] || STATUS_CONFIG.pending;
+   239→  return (
+   240→    <Badge
+   241→      variant="outline"
+   242→      className={`${config.color} ${config.bgColor} ${config.borderColor} gap-1 text-xs font-medium`}
+   243→    >
+   244→      {config.icon}
+   245→      {config.label}
+   246→    </Badge>
+   247→  );
+   248→}
+   249→
+   250→// ─── Main Dashboard Component ─────────────────────────────────────
+   251→
+   252→export default function AdminDashboard() {
+   253→  const [stats, setStats] = useState<DashboardStats | null>(null);
+   254→  const [bookings, setBookings] = useState<Booking[]>([]);
+   255→  const [subscribers, setSubscribers] = useState<NewsletterSub[]>([]);
+   256→  const [microReadings, setMicroReadings] = useState<MicroReadingLead[]>([]);
+   257→  const [loading, setLoading] = useState(true);
+   258→  const [activeTab, setActiveTab] = useState("overview");
+   259→  const [bookingFilter, setBookingFilter] = useState("all");
+   260→  const [searchQuery, setSearchQuery] = useState("");
+   261→  const [updatingId, setUpdatingId] = useState<string | null>(null);
+   262→  const [refreshing, setRefreshing] = useState(false);
+   263→
+   264→  // ─── Data Fetching ────────────────────────────────────────────────
+   265→
+   266→  const fetchStats = useCallback(async () => {
+   267→    try {
+   268→      const res = await fetch("/api/admin/stats");
+   269→      if (res.ok) {
+   270→        const data = await res.json();
+   271→        setStats(data);
+   272→      }
+   273→    } catch (err) {
+   274→      console.error("Failed to fetch stats:", err);
+   275→    }
+   276→  }, []);
+   277→
+   278→  const fetchBookings = useCallback(async () => {
+   279→    try {
+   280→      const statusParam = bookingFilter !== "all" ? `?status=${bookingFilter}` : "";
+   281→      const res = await fetch(`/api/bookings${statusParam}`);
+   282→      if (res.ok) {
+   283→        const data = await res.json();
+   284→        setBookings(data.bookings || []);
+   285→      }
+   286→    } catch (err) {
+   287→      console.error("Failed to fetch bookings:", err);
+   288→    }
+   289→  }, [bookingFilter]);
+   290→
+   291→  const fetchSubscribers = useCallback(async () => {
+   292→    try {
+   293→      const res = await fetch("/api/admin/newsletter");
+   294→      if (res.ok) {
+   295→        const data = await res.json();
+   296→        setSubscribers(data.subscribers || []);
+   297→      }
+   298→    } catch (err) {
+   299→      console.error("Failed to fetch subscribers:", err);
+   300→    }
+   301→  }, []);
+   302→
+   303→  const fetchMicroReadings = useCallback(async () => {
+   304→    try {
+   305→      const res = await fetch("/api/admin/micro-readings");
+   306→      if (res.ok) {
+   307→        const data = await res.json();
+   308→        setMicroReadings(data.readings || []);
+   309→      }
+   310→    } catch (err) {
+   311→      console.error("Failed to fetch micro-readings:", err);
+   312→    }
+   313→  }, []);
+   314→
+   315→  const loadAllData = useCallback(async () => {
+   316→    setLoading(true);
+   317→    await Promise.all([
+   318→      fetchStats(),
+   319→      fetchBookings(),
+   320→      fetchSubscribers(),
+   321→      fetchMicroReadings(),
+   322→    ]);
+   323→    setLoading(false);
+   324→  }, [fetchStats, fetchBookings, fetchSubscribers, fetchMicroReadings]);
+   325→
+   326→  useEffect(() => {
+   327→    loadAllData();
+   328→  }, [loadAllData]);
+   329→
+   330→  // Re-fetch bookings when filter changes
+   331→  useEffect(() => {
+   332→    if (!loading) {
+   333→      fetchBookings();
+   334→    }
+   335→  }, [bookingFilter, fetchBookings, loading]);
+   336→
+   337→  const handleRefresh = async () => {
+   338→    setRefreshing(true);
+   339→    await loadAllData();
+   340→    setRefreshing(false);
+   341→  };
+   342→
+   343→  // ─── Booking Status Update ──────────────────────────────────────
+   344→
+   345→  const updateBookingStatus = async (id: string, newStatus: string) => {
+   346→    setUpdatingId(id);
+   347→    try {
+   348→      const res = await fetch(`/api/admin/bookings/${id}`, {
+   349→        method: "PATCH",
+   350→        headers: { "Content-Type": "application/json" },
+   351→        body: JSON.stringify({ status: newStatus }),
+   352→      });
+   353→
+   354→      if (res.ok) {
+   355→        setBookings((prev) =>
+   356→          prev.map((b) => (b.id === id ? { ...b, status: newStatus } : b))
+   357→        );
+   358→        // Update stats after status change
+   359→        fetchStats();
+   360→      }
+   361→    } catch (err) {
+   362→      console.error("Failed to update booking status:", err);
+   363→    } finally {
+   364→      setUpdatingId(null);
+   365→    }
+   366→  };
+   367→
+   368→  const deleteBooking = async (id: string) => {
+   369→    if (!confirm("Are you sure you want to delete this booking?")) return;
+   370→    try {
+   371→      const res = await fetch(`/api/admin/bookings/${id}`, { method: "DELETE" });
+   372→      if (res.ok) {
+   373→        setBookings((prev) => prev.filter((b) => b.id !== id));
+   374→        fetchStats();
+   375→      }
+   376→    } catch (err) {
+   377→      console.error("Failed to delete booking:", err);
+   378→    }
+   379→  };
+   380→
+   381→  // ─── Filtered Bookings ──────────────────────────────────────────
+   382→
+   383→  const filteredBookings = bookings.filter((b) => {
+   384→    if (!searchQuery) return true;
+   385→    const q = searchQuery.toLowerCase();
+   386→    return (
+   387→      b.name.toLowerCase().includes(q) ||
+   388→      b.email.toLowerCase().includes(q) ||
+   389→      b.id.toLowerCase().includes(q)
+   390→    );
+   391→  });
+   392→
+   393→  // ─── Render ──────────────────────────────────────────────────────
+   394→
+   395→  return (
+   396→    <div className="min-h-screen bg-[#050505] text-[#e8e6e1]">
+   397→      {/* Grain overlay inherited from layout */}
+   398→      <div className="grain-overlay" style={{ opacity: 0.008 }} />
+   399→
+   400→      {/* ─── Header ──────────────────────────────────────────────── */}
+   401→      <motion.header
+   402→        initial={{ opacity: 0, y: -20 }}
+   403→        animate={{ opacity: 1, y: 0 }}
+   404→        transition={{ duration: 0.6 }}
+   405→        className="sticky top-0 z-40 bg-[#050505]/80 backdrop-blur-xl border-b border-white/[0.04]"
+   406→      >
+   407→        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+   408→          <div className="flex items-center justify-between h-16 sm:h-20">
+   409→            <div className="flex items-center gap-3 sm:gap-4">
+   410→              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-[#c9a96e] to-[#a8884d] flex items-center justify-center">
+   411→                <Star className="size-4 text-[#050505]" />
+   412→              </div>
+   413→              <div>
+   414→                <h1 className="text-editorial text-sm sm:text-base text-[#f0eee9] tracking-[0.12em]">
+   415→                  ASTROKALKI
+   416→                </h1>
+   417→                <p className="text-body-cinematic text-[10px] sm:text-xs">
+   418→                  Command Center
+   419→                </p>
+   420→              </div>
+   421→            </div>
+   422→            <div className="flex items-center gap-2 sm:gap-3">
+   423→              <a
+   424→                href="/"
+   425→                target="_blank"
+   426→                rel="noopener noreferrer"
+   427→                className="btn-outline-gold px-3 py-1.5 rounded-md text-xs flex items-center gap-1.5"
+   428→              >
+   429→                <ExternalLink className="size-3" />
+   430→                <span className="hidden sm:inline">View Site</span>
+   431→              </a>
+   432→              <Button
+   433→                variant="ghost"
+   434→                size="icon"
+   435→                onClick={handleRefresh}
+   436→                disabled={refreshing}
+   437→                className="text-[#9a9a9a] hover:text-[#c9a96e] hover:bg-[#c9a96e]/10"
+   438→              >
+   439→                <RefreshCw
+   440→                  className={`size-4 ${refreshing ? "animate-spin" : ""}`}
+   441→                />
+   442→              </Button>
+   443→              <Button
+   444→                variant="ghost"
+   445→                size="sm"
+   446→                onClick={async () => {
+   447→                  await fetch('/api/admin/logout', { method: 'POST' });
+   448→                  window.location.href = '/admin/login';
+   449→                }}
+   450→                className="text-[#9a9a9a] hover:text-red-400 hover:bg-red-500/10 text-xs"
+   451→              >
+   452→                Logout
+   453→              </Button>
+   454→            </div>
+   455→          </div>
+   456→        </div>
+   457→      </motion.header>
+   458→
+   459→      {/* ─── Main Content ────────────────────────────────────────── */}
+   460→      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-10">
+   461→        <Tabs value={activeTab} onValueChange={setActiveTab}>
+   462→          {/* ─── Tab Navigation ─────────────────────────────────── */}
+   463→          <div className="mb-6 sm:mb-8">
+   464→            <TabsList className="bg-[#0a0a0a] border border-white/[0.04] rounded-lg p-1 h-auto flex-wrap gap-1">
+   465→              <TabsTrigger
+   466→                value="overview"
+   467→                className="data-[state=active]:bg-[#c9a96e]/10 data-[state=active]:text-[#c9a96e] data-[state=active]:border-[#c9a96e]/20 text-[#9a9a9a] rounded-md px-3 sm:px-4 py-2 text-xs sm:text-sm"
+   468→              >
+   469→                <Eye className="size-3.5 mr-1.5" />
+   470→                Overview
+   471→              </TabsTrigger>
+   472→              <TabsTrigger
+   473→                value="bookings"
+   474→                className="data-[state=active]:bg-[#c9a96e]/10 data-[state=active]:text-[#c9a96e] data-[state=active]:border-[#c9a96e]/20 text-[#9a9a9a] rounded-md px-3 sm:px-4 py-2 text-xs sm:text-sm"
+   475→              >
+   476→                <Calendar className="size-3.5 mr-1.5" />
+   477→                Bookings
+   478→                {stats && stats.pendingBookings > 0 && (
+   479→                  <span className="ml-1.5 bg-yellow-400/20 text-yellow-400 text-[10px] px-1.5 py-0.5 rounded-full">
+   480→                    {stats.pendingBookings}
+   481→                  </span>
+   482→                )}
+   483→              </TabsTrigger>
+   484→              <TabsTrigger
+   485→                value="newsletter"
+   486→                className="data-[state=active]:bg-[#c9a96e]/10 data-[state=active]:text-[#c9a96e] data-[state=active]:border-[#c9a96e]/20 text-[#9a9a9a] rounded-md px-3 sm:px-4 py-2 text-xs sm:text-sm"
+   487→              >
+   488→                <Mail className="size-3.5 mr-1.5" />
+   489→                Newsletter
+   490→              </TabsTrigger>
+   491→              <TabsTrigger
+   492→                value="micro-readings"
+   493→                className="data-[state=active]:bg-[#c9a96e]/10 data-[state=active]:text-[#c9a96e] data-[state=active]:border-[#c9a96e]/20 text-[#9a9a9a] rounded-md px-3 sm:px-4 py-2 text-xs sm:text-sm"
+   494→              >
+   495→                <Star className="size-3.5 mr-1.5" />
+   496→                Micro-Readings
+   497→              </TabsTrigger>
+   498→            </TabsList>
+   499→          </div>
+   500→
+   501→          {/* ═══════════════════════════════════════════════════════
+   502→              OVERVIEW TAB
+   503→              ═══════════════════════════════════════════════════════ */}
+   504→          <TabsContent value="overview">
+   505→            {loading ? (
+   506→              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+   507→                {[...Array(4)].map((_, i) => (
+   508→                  <Card
+   509→                    key={i}
+   510→                    className="bg-[#0a0a0a] border-white/[0.04]"
+   511→                  >
+   512→                    <CardContent className="p-6 space-y-3">
+   513→                      <Skeleton className="h-3 w-20 bg-[#141414]" />
+   514→                      <Skeleton className="h-8 w-24 bg-[#141414]" />
+   515→                      <Skeleton className="h-3 w-32 bg-[#141414]" />
+   516→                    </CardContent>
+   517→                  </Card>
+   518→                ))}
+   519→              </div>
+   520→            ) : stats ? (
+   521→              <>
+   522→                {/* Stats Grid */}
+   523→                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-8">
+   524→                  <StatCard
+   525→                    title="Total Bookings"
+   526→                    value={stats.totalBookings}
+   527→                    subtitle={`${stats.recentBookings} this week`}
+   528→                    icon={<Calendar className="size-5 text-[#c9a96e]" />}
+   529→                    accent="bg-[#c9a96e]/10"
+   530→                    delay={0}
+   531→                  />
+   532→                  <StatCard
+   533→                    title="Pending"
+   534→                    value={stats.pendingBookings}
+   535→                    subtitle={
+   536→                      stats.pendingBookings > 0
+   537→                        ? "Needs attention"
+   538→                        : "All clear"
+   539→                    }
+   540→                    icon={
+   541→                      <AlertCircle className="size-5 text-yellow-400" />
+   542→                    }
+   543→                    accent="bg-yellow-400/10"
+   544→                    delay={0.1}
+   545→                  />
+   546→                  <StatCard
+   547→                    title="Revenue"
+   548→                    value={`₹${stats.totalRevenue.toLocaleString("en-IN")}`}
+   549→                    subtitle={`From ${stats.confirmedBookings + stats.completedBookings} bookings`}
+   550→                    icon={<DollarSign className="size-5 text-emerald-400" />}
+   551→                    accent="bg-emerald-400/10"
+   552→                    delay={0.2}
+   553→                  />
+   554→                  <StatCard
+   555→                    title="Newsletter"
+   556→                    value={stats.totalNewsletter}
+   557→                    subtitle={`${stats.recentNewsletter} this week`}
+   558→                    icon={<Users className="size-5 text-blue-400" />}
+   559→                    accent="bg-blue-400/10"
+   560→                    delay={0.3}
+   561→                  />
+   562→                </div>
+   563→
+   564→                {/* Secondary Stats */}
+   565→                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 mb-8">
+   566→                  <motion.div
+   567→                    initial={{ opacity: 0, y: 15 }}
+   568→                    animate={{ opacity: 1, y: 0 }}
+   569→                    transition={{ duration: 0.5, delay: 0.4 }}
+   570→                    className="bg-[#0a0a0a] border border-white/[0.04] rounded-xl p-4 text-center"
+   571→                  >
+   572→                    <p className="text-emerald-400 text-lg sm:text-xl font-bold">
+   573→                      {stats.completedBookings}
+   574→                    </p>
+   575→                    <p className="text-body-cinematic text-[10px] sm:text-xs mt-1">
+   576→                      Completed
+   577→                    </p>
+   578→                  </motion.div>
+   579→                  <motion.div
+   580→                    initial={{ opacity: 0, y: 15 }}
+   581→                    animate={{ opacity: 1, y: 0 }}
+   582→                    transition={{ duration: 0.5, delay: 0.45 }}
+   583→                    className="bg-[#0a0a0a] border border-white/[0.04] rounded-xl p-4 text-center"
+   584→                  >
+   585→                    <p className="text-[#c9a96e] text-lg sm:text-xl font-bold">
+   586→                      {stats.confirmedBookings}
+   587→                    </p>
+   588→                    <p className="text-body-cinematic text-[10px] sm:text-xs mt-1">
+   589→                      Confirmed
+   590→                    </p>
+   591→                  </motion.div>
+   592→                  <motion.div
+   593→                    initial={{ opacity: 0, y: 15 }}
+   594→                    animate={{ opacity: 1, y: 0 }}
+   595→                    transition={{ duration: 0.5, delay: 0.5 }}
+   596→                    className="bg-[#0a0a0a] border border-white/[0.04] rounded-xl p-4 text-center"
+   597→                  >
+   598→                    <p className="text-[#c0392b] text-lg sm:text-xl font-bold">
+   599→                      {stats.cancelledBookings}
+   600→                    </p>
+   601→                    <p className="text-body-cinematic text-[10px] sm:text-xs mt-1">
+   602→                      Cancelled
+   603→                    </p>
+   604→                  </motion.div>
+   605→                  <motion.div
+   606→                    initial={{ opacity: 0, y: 15 }}
+   607→                    animate={{ opacity: 1, y: 0 }}
+   608→                    transition={{ duration: 0.5, delay: 0.55 }}
+   609→                    className="bg-[#0a0a0a] border border-white/[0.04] rounded-xl p-4 text-center"
+   610→                  >
+   611→                    <p className="text-blue-400 text-lg sm:text-xl font-bold">
+   612→                      {stats.totalMicroReadings}
+   613→                    </p>
+   614→                    <p className="text-body-cinematic text-[10px] sm:text-xs mt-1">
+   615→                      Micro-Leads
+   616→                    </p>
+   617→                  </motion.div>
+   618→                </div>
+   619→
+   620→                {/* Recent Bookings Quick View */}
+   621→                <motion.div
+   622→                  initial={{ opacity: 0, y: 20 }}
+   623→                  animate={{ opacity: 1, y: 0 }}
+   624→                  transition={{ duration: 0.5, delay: 0.6 }}
+   625→                >
+   626→                  <Card className="bg-[#0a0a0a] border-white/[0.04]">
+   627→                    <CardHeader>
+   628→                      <div className="flex items-center justify-between">
+   629→                        <div>
+   630→                          <CardTitle className="text-editorial text-sm text-[#f0eee9] tracking-wider">
+   631→                            RECENT BOOKINGS
+   632→                          </CardTitle>
+   633→                          <CardDescription className="text-body-cinematic text-xs mt-1">
+   634→                            Latest booking activity
+   635→                          </CardDescription>
+   636→                        </div>
+   637→                        <Button
+   638→                          variant="ghost"
+   639→                          size="sm"
+   640→                          onClick={() => setActiveTab("bookings")}
+   641→                          className="text-[#c9a96e] hover:text-[#c9a96e] hover:bg-[#c9a96e]/10 text-xs"
+   642→                        >
+   643→                          View All
+   644→                          <ArrowUpRight className="size-3 ml-1" />
+   645→                        </Button>
+   646→                      </div>
+   647→                    </CardHeader>
+   648→                    <CardContent>
+   649→                      {bookings.length === 0 ? (
+   650→                        <div className="text-center py-8">
+   651→                          <Calendar className="size-8 text-[#333] mx-auto mb-2" />
+   652→                          <p className="text-body-cinematic text-sm">
+   653→                            No bookings yet
+   654→                          </p>
+   655→                        </div>
+   656→                      ) : (
+   657→                        <div className="space-y-3 max-h-80 overflow-y-auto">
+   658→                          {bookings.slice(0, 5).map((booking) => (
+   659→                            <div
+   660→                              key={booking.id}
+   661→                              className="flex items-center justify-between p-3 rounded-lg bg-[#111]/50 border border-white/[0.02] hover:border-white/[0.06] transition-colors"
+   662→                            >
+   663→                              <div className="flex-1 min-w-0">
+   664→                                <p className="text-[#f0eee9] text-sm font-medium truncate">
+   665→                                  {booking.name}
+   666→                                </p>
+   667→                                <p className="text-body-cinematic text-xs truncate">
+   668→                                  {booking.email}
+   669→                                </p>
+   670→                              </div>
+   671→                              <div className="flex items-center gap-3 ml-3">
+   672→                                <span className="text-[#c9a96e] text-sm font-medium whitespace-nowrap">
+   673→                                  {formatPrice(booking.price)}
+   674→                                </span>
+   675→                                <StatusBadge status={booking.status} />
+   676→                              </div>
+   677→                            </div>
+   678→                          ))}
+   679→                        </div>
+   680→                      )}
+   681→                    </CardContent>
+   682→                  </Card>
+   683→                </motion.div>
+   684→              </>
+   685→            ) : (
+   686→              <div className="text-center py-12">
+   687→                <AlertCircle className="size-8 text-[#c0392b] mx-auto mb-3" />
+   688→                <p className="text-body-cinematic">
+   689→                  Failed to load dashboard data
+   690→                </p>
+   691→                <Button
+   692→                  variant="outline"
+   693→                  onClick={handleRefresh}
+   694→                  className="btn-outline-gold mt-4"
+   695→                >
+   696→                  Retry
+   697→                </Button>
+   698→              </div>
+   699→            )}
+   700→          </TabsContent>
+   701→
+   702→          {/* ═══════════════════════════════════════════════════════
+   703→              BOOKINGS TAB
+   704→              ═══════════════════════════════════════════════════════ */}
+   705→          <TabsContent value="bookings">
+   706→            <motion.div
+   707→              initial={{ opacity: 0, y: 20 }}
+   708→              animate={{ opacity: 1, y: 0 }}
+   709→              transition={{ duration: 0.4 }}
+   710→            >
+   711→              <Card className="bg-[#0a0a0a] border-white/[0.04]">
+   712→                <CardHeader>
+   713→                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+   714→                    <div>
+   715→                      <CardTitle className="text-editorial text-sm text-[#f0eee9] tracking-wider">
+   716→                        BOOKING MANAGEMENT
+   717→                      </CardTitle>
+   718→                      <CardDescription className="text-body-cinematic text-xs mt-1">
+   719→                        {filteredBookings.length} booking
+   720→                        {filteredBookings.length !== 1 ? "s" : ""} found
+   721→                      </CardDescription>
+   722→                    </div>
+   723→                    <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
+   724→                      <div className="relative">
+   725→                        <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 size-3.5 text-[#9a9a9a]" />
+   726→                        <Input
+   727→                          placeholder="Search bookings..."
+   728→                          value={searchQuery}
+   729→                          onChange={(e) => setSearchQuery(e.target.value)}
+   730→                          className="pl-8 h-8 text-xs bg-[#111] border-white/[0.06] text-[#e8e6e1] placeholder:text-[#555] w-full sm:w-48 focus:border-[#c9a96e]/30 focus:ring-[#c9a96e]/20"
+   731→                        />
+   732→                      </div>
+   733→                      <Select value={bookingFilter} onValueChange={setBookingFilter}>
+   734→                        <SelectTrigger className="h-8 text-xs bg-[#111] border-white/[0.06] text-[#e8e6e1] w-full sm:w-36">
+   735→                          <SelectValue />
+   736→                        </SelectTrigger>
+   737→                        <SelectContent className="bg-[#0a0a0a] border-white/[0.06]">
+   738→                          <SelectItem value="all" className="text-xs text-[#e8e6e1] focus:bg-[#c9a96e]/10 focus:text-[#c9a96e]">
+   739→                            All Status
+   740→                          </SelectItem>
+   741→                          <SelectItem value="pending" className="text-xs text-yellow-400 focus:bg-yellow-400/10">
+   742→                            Pending
+   743→                          </SelectItem>
+   744→                          <SelectItem value="confirmed" className="text-xs text-[#c9a96e] focus:bg-[#c9a96e]/10">
+   745→                            Confirmed
+   746→                          </SelectItem>
+   747→                          <SelectItem value="completed" className="text-xs text-emerald-400 focus:bg-emerald-400/10">
+   748→                            Completed
+   749→                          </SelectItem>
+   750→                          <SelectItem value="cancelled" className="text-xs text-[#c0392b] focus:bg-[#c0392b]/10">
+   751→                            Cancelled
+   752→                          </SelectItem>
+   753→                        </SelectContent>
+   754→                      </Select>
+   755→                    </div>
+   756→                  </div>
+   757→                </CardHeader>
+   758→                <CardContent>
+   759→                  {loading ? (
+   760→                    <div className="space-y-3">
+   761→                      {[...Array(5)].map((_, i) => (
+   762→                        <Skeleton
+   763→                          key={i}
+   764→                          className="h-14 w-full bg-[#141414] rounded-lg"
+   765→                        />
+   766→                      ))}
+   767→                    </div>
+   768→                  ) : filteredBookings.length === 0 ? (
+   769→                    <div className="text-center py-12">
+   770→                      <Calendar className="size-10 text-[#333] mx-auto mb-3" />
+   771→                      <p className="text-body-cinematic text-sm">
+   772→                        No bookings found
+   773→                      </p>
+   774→                      {bookingFilter !== "all" && (
+   775→                        <Button
+   776→                          variant="ghost"
+   777→                          size="sm"
+   778→                          onClick={() => setBookingFilter("all")}
+   779→                          className="text-[#c9a96e] mt-3 text-xs"
+   780→                        >
+   781→                          Clear filter
+   782→                        </Button>
+   783→                      )}
+   784→                    </div>
+   785→                  ) : (
+   786→                    <>
+   787→                      {/* Desktop Table */}
+   788→                      <div className="hidden md:block overflow-x-auto">
+   789→                        <Table>
+   790→                          <TableHeader>
+   791→                            <TableRow className="border-white/[0.04] hover:bg-transparent">
+   792→                              <TableHead className="text-[#9a9a9a] text-xs font-medium">
+   793→                                Name
+   794→                              </TableHead>
+   795→                              <TableHead className="text-[#9a9a9a] text-xs font-medium">
+   796→                                Email
+   797→                              </TableHead>
+   798→                              <TableHead className="text-[#9a9a9a] text-xs font-medium">
+   799→                                Duration
+   800→                              </TableHead>
+   801→                              <TableHead className="text-[#9a9a9a] text-xs font-medium">
+   802→                                Price
+   803→                              </TableHead>
+   804→                              <TableHead className="text-[#9a9a9a] text-xs font-medium">
+   805→                                Status
+   806→                              </TableHead>
+   807→                              <TableHead className="text-[#9a9a9a] text-xs font-medium">
+   808→                                Date
+   809→                              </TableHead>
+   810→                              <TableHead className="text-[#9a9a9a] text-xs font-medium text-right">
+   811→                                Actions
+   812→                              </TableHead>
+   813→                            </TableRow>
+   814→                          </TableHeader>
+   815→                          <TableBody>
+   816→                            <AnimatePresence mode="popLayout">
+   817→                              {filteredBookings.map((booking, i) => (
+   818→                                <motion.tr
+   819→                                  key={booking.id}
+   820→                                  initial={{ opacity: 0, x: -10 }}
+   821→                                  animate={{ opacity: 1, x: 0 }}
+   822→                                  exit={{ opacity: 0, x: 10 }}
+   823→                                  transition={{ duration: 0.3, delay: i * 0.03 }}
+   824→                                  className="border-white/[0.02] hover:bg-white/[0.02] transition-colors"
+   825→                                >
+   826→                                  <TableCell className="text-[#f0eee9] text-sm font-medium">
+   827→                                    {booking.name}
+   828→                                  </TableCell>
+   829→                                  <TableCell className="text-body-cinematic text-xs">
+   830→                                    {booking.email}
+   831→                                  </TableCell>
+   832→                                  <TableCell>
+   833→                                    <div className="flex items-center gap-1 text-body-cinematic text-xs">
+   834→                                      <Clock className="size-3" />
+   835→                                      {booking.duration}m
+   836→                                    </div>
+   837→                                  </TableCell>
+   838→                                  <TableCell className="text-[#c9a96e] text-sm font-medium">
+   839→                                    {formatPrice(booking.price)}
+   840→                                  </TableCell>
+   841→                                  <TableCell>
+   842→                                    <StatusBadge status={booking.status} />
+   843→                                  </TableCell>
+   844→                                  <TableCell className="text-body-cinematic text-xs">
+   845→                                    {formatDate(booking.createdAt)}
+   846→                                  </TableCell>
+   847→                                  <TableCell className="text-right">
+   848→                                    <div className="flex items-center justify-end gap-1.5">
+   849→                                      <Select
+   850→                                        value={booking.status}
+   851→                                        onValueChange={(val) =>
+   852→                                          updateBookingStatus(booking.id, val)
+   853→                                        }
+   854→                                        disabled={updatingId === booking.id}
+   855→                                      >
+   856→                                        <SelectTrigger
+   857→                                          size="sm"
+   858→                                          className="h-7 text-[10px] w-28 bg-[#111] border-white/[0.06] text-[#e8e6e1]"
+   859→                                        >
+   860→                                          <SelectValue />
+   861→                                        </SelectTrigger>
+   862→                                        <SelectContent className="bg-[#0a0a0a] border-white/[0.06]">
+   863→                                          <SelectItem value="pending" className="text-xs text-yellow-400 focus:bg-yellow-400/10">
+   864→                                            Pending
+   865→                                          </SelectItem>
+   866→                                          <SelectItem value="confirmed" className="text-xs text-[#c9a96e] focus:bg-[#c9a96e]/10">
+   867→                                            Confirmed
+   868→                                          </SelectItem>
+   869→                                          <SelectItem value="completed" className="text-xs text-emerald-400 focus:bg-emerald-400/10">
+   870→                                            Completed
+   871→                                          </SelectItem>
+   872→                                          <SelectItem value="cancelled" className="text-xs text-[#c0392b] focus:bg-[#c0392b]/10">
+   873→                                            Cancelled
+   874→                                          </SelectItem>
+   875→                                        </SelectContent>
+   876→                                      </Select>
+   877→                                      <Button
+   878→                                        variant="ghost"
+   879→                                        size="icon"
+   880→                                        className="size-7 text-[#555] hover:text-[#c0392b] hover:bg-[#c0392b]/10"
+   881→                                        onClick={() => deleteBooking(booking.id)}
+   882→                                      >
+   883→                                        <Trash2 className="size-3" />
+   884→                                      </Button>
+   885→                                    </div>
+   886→                                  </TableCell>
+   887→                                </motion.tr>
+   888→                              ))}
+   889→                            </AnimatePresence>
+   890→                          </TableBody>
+   891→                        </Table>
+   892→                      </div>
+   893→
+   894→                      {/* Mobile Cards */}
+   895→                      <div className="md:hidden space-y-3 max-h-[70vh] overflow-y-auto">
+   896→                        {filteredBookings.map((booking, i) => (
+   897→                          <motion.div
+   898→                            key={booking.id}
+   899→                            initial={{ opacity: 0, y: 10 }}
+   900→                            animate={{ opacity: 1, y: 0 }}
+   901→                            transition={{ duration: 0.3, delay: i * 0.05 }}
+   902→                            className="bg-[#111]/50 border border-white/[0.04] rounded-xl p-4 space-y-3"
+   903→                          >
+   904→                            <div className="flex items-start justify-between">
+   905→                              <div className="min-w-0 flex-1">
+   906→                                <p className="text-[#f0eee9] text-sm font-medium truncate">
+   907→                                  {booking.name}
+   908→                                </p>
+   909→                                <p className="text-body-cinematic text-xs truncate">
+   910→                                  {booking.email}
+   911→                                </p>
+   912→                              </div>
+   913→                              <StatusBadge status={booking.status} />
+   914→                            </div>
+   915→                            <div className="flex items-center justify-between text-xs">
+   916→                              <div className="flex items-center gap-3">
+   917→                                <span className="text-body-cinematic flex items-center gap-1">
+   918→                                  <Clock className="size-3" />
+   919→                                  {booking.duration}m
+   920→                                </span>
+   921→                                <span className="text-[#c9a96e] font-medium">
+   922→                                  {formatPrice(booking.price)}
+   923→                                </span>
+   924→                              </div>
+   925→                              <span className="text-body-cinematic">
+   926→                                {formatDate(booking.createdAt)}
+   927→                              </span>
+   928→                            </div>
+   929→                            <div className="flex items-center justify-between pt-2 border-t border-white/[0.04]">
+   930→                              <Select
+   931→                                value={booking.status}
+   932→                                onValueChange={(val) =>
+   933→                                  updateBookingStatus(booking.id, val)
+   934→                                }
+   935→                                disabled={updatingId === booking.id}
+   936→                              >
+   937→                                <SelectTrigger
+   938→                                  size="sm"
+   939→                                  className="h-7 text-[10px] w-28 bg-[#0a0a0a] border-white/[0.06] text-[#e8e6e1]"
+   940→                                >
+   941→                                  <SelectValue />
+   942→                                </SelectTrigger>
+   943→                                <SelectContent className="bg-[#0a0a0a] border-white/[0.06]">
+   944→                                  <SelectItem value="pending" className="text-xs text-yellow-400 focus:bg-yellow-400/10">
+   945→                                    Pending
+   946→                                  </SelectItem>
+   947→                                  <SelectItem value="confirmed" className="text-xs text-[#c9a96e] focus:bg-[#c9a96e]/10">
+   948→                                    Confirmed
+   949→                                  </SelectItem>
+   950→                                  <SelectItem value="completed" className="text-xs text-emerald-400 focus:bg-emerald-400/10">
+   951→                                    Completed
+   952→                                  </SelectItem>
+   953→                                  <SelectItem value="cancelled" className="text-xs text-[#c0392b] focus:bg-[#c0392b]/10">
+   954→                                    Cancelled
+   955→                                  </SelectItem>
+   956→                                </SelectContent>
+   957→                              </Select>
+   958→                              <Button
+   959→                                variant="ghost"
+   960→                                size="icon"
+   961→                                className="size-7 text-[#555] hover:text-[#c0392b] hover:bg-[#c0392b]/10"
+   962→                                onClick={() => deleteBooking(booking.id)}
+   963→                              >
+   964→                                <Trash2 className="size-3" />
+   965→                              </Button>
+   966→                            </div>
+   967→                          </motion.div>
+   968→                        ))}
+   969→                      </div>
+   970→                    </>
+   971→                  )}
+   972→                </CardContent>
+   973→              </Card>
+   974→            </motion.div>
+   975→          </TabsContent>
+   976→
+   977→          {/* ═══════════════════════════════════════════════════════
+   978→              NEWSLETTER TAB
+   979→              ═══════════════════════════════════════════════════════ */}
+   980→          <TabsContent value="newsletter">
+   981→            <motion.div
+   982→              initial={{ opacity: 0, y: 20 }}
+   983→              animate={{ opacity: 1, y: 0 }}
+   984→              transition={{ duration: 0.4 }}
+   985→            >
+   986→              <Card className="bg-[#0a0a0a] border-white/[0.04]">
+   987→                <CardHeader>
+   988→                  <div className="flex items-center justify-between">
+   989→                    <div>
+   990→                      <CardTitle className="text-editorial text-sm text-[#f0eee9] tracking-wider">
+   991→                        NEWSLETTER SUBSCRIBERS
+   992→                      </CardTitle>
+   993→                      <CardDescription className="text-body-cinematic text-xs mt-1">
+   994→                        {subscribers.length} subscriber
+   995→                        {subscribers.length !== 1 ? "s" : ""}
+   996→                      </CardDescription>
+   997→                    </div>
+   998→                    <div className="bg-[#c9a96e]/10 border border-[#c9a96e]/20 rounded-lg px-3 py-1.5">
+   999→                      <span className="text-[#c9a96e] text-xs font-medium">
+  1000→                        {subscribers.length} total
+  1001→                      </span>
+  1002→                    </div>
+  1003→                  </div>
+  1004→                </CardHeader>
+  1005→                <CardContent>
+  1006→                  {loading ? (
+  1007→                    <div className="space-y-3">
+  1008→                      {[...Array(5)].map((_, i) => (
+  1009→                        <Skeleton
+  1010→                          key={i}
+  1011→                          className="h-10 w-full bg-[#141414] rounded-lg"
+  1012→                        />
+  1013→                      ))}
+  1014→                    </div>
+  1015→                  ) : subscribers.length === 0 ? (
+  1016→                    <div className="text-center py-12">
+  1017→                      <Mail className="size-10 text-[#333] mx-auto mb-3" />
+  1018→                      <p className="text-body-cinematic text-sm">
+  1019→                        No newsletter subscribers yet
+  1020→                      </p>
+  1021→                    </div>
+  1022→                  ) : (
+  1023→                    <>
+  1024→                      {/* Desktop Table */}
+  1025→                      <div className="hidden md:block overflow-x-auto">
+  1026→                        <Table>
+  1027→                          <TableHeader>
+  1028→                            <TableRow className="border-white/[0.04] hover:bg-transparent">
+  1029→                              <TableHead className="text-[#9a9a9a] text-xs font-medium">
+  1030→                                #
+  1031→                              </TableHead>
+  1032→                              <TableHead className="text-[#9a9a9a] text-xs font-medium">
+  1033→                                Email
+  1034→                              </TableHead>
+  1035→                              <TableHead className="text-[#9a9a9a] text-xs font-medium">
+  1036→                                Source
+  1037→                              </TableHead>
+  1038→                              <TableHead className="text-[#9a9a9a] text-xs font-medium">
+  1039→                                Subscribed
+  1040→                              </TableHead>
+  1041→                            </TableRow>
+  1042→                          </TableHeader>
+  1043→                          <TableBody>
+  1044→                            {subscribers.map((sub, i) => (
+  1045→                              <motion.tr
+  1046→                                key={sub.id}
+  1047→                                initial={{ opacity: 0 }}
+  1048→                                animate={{ opacity: 1 }}
+  1049→                                transition={{ duration: 0.3, delay: i * 0.03 }}
+  1050→                                className="border-white/[0.02] hover:bg-white/[0.02] transition-colors"
+  1051→                              >
+  1052→                                <TableCell className="text-[#555] text-xs">
+  1053→                                  {i + 1}
+  1054→                                </TableCell>
+  1055→                                <TableCell className="text-[#f0eee9] text-sm">
+  1056→                                  {sub.email}
+  1057→                                </TableCell>
+  1058→                                <TableCell>
+  1059→                                  <Badge
+  1060→                                    variant="outline"
+  1061→                                    className="text-[#9a9a9a] border-white/[0.06] text-[10px]"
+  1062→                                  >
+  1063→                                    {sub.source || "website"}
+  1064→                                  </Badge>
+  1065→                                </TableCell>
+  1066→                                <TableCell className="text-body-cinematic text-xs">
+  1067→                                  {formatDateTime(sub.createdAt)}
+  1068→                                </TableCell>
+  1069→                              </motion.tr>
+  1070→                            ))}
+  1071→                          </TableBody>
+  1072→                        </Table>
+  1073→                      </div>
+  1074→
+  1075→                      {/* Mobile Cards */}
+  1076→                      <div className="md:hidden space-y-2 max-h-[70vh] overflow-y-auto">
+  1077→                        {subscribers.map((sub, i) => (
+  1078→                          <motion.div
+  1079→                            key={sub.id}
+  1080→                            initial={{ opacity: 0, y: 10 }}
+  1081→                            animate={{ opacity: 1, y: 0 }}
+  1082→                            transition={{ duration: 0.3, delay: i * 0.04 }}
+  1083→                            className="flex items-center justify-between p-3 bg-[#111]/50 border border-white/[0.04] rounded-lg"
+  1084→                          >
+  1085→                            <div className="min-w-0 flex-1">
+  1086→                              <p className="text-[#f0eee9] text-sm truncate">
+  1087→                                {sub.email}
+  1088→                              </p>
+  1089→                              <p className="text-body-cinematic text-[10px]">
+  1090→                                {formatDateTime(sub.createdAt)}
+  1091→                              </p>
+  1092→                            </div>
+  1093→                            <Badge
+  1094→                              variant="outline"
+  1095→                              className="text-[#9a9a9a] border-white/[0.06] text-[10px] ml-2"
+  1096→                            >
+  1097→                              {sub.source || "website"}
+  1098→                            </Badge>
+  1099→                          </motion.div>
+  1100→                        ))}
+  1101→                      </div>
+  1102→                    </>
+  1103→                  )}
+  1104→                </CardContent>
+  1105→              </Card>
+  1106→            </motion.div>
+  1107→          </TabsContent>
+  1108→
+  1109→          {/* ═══════════════════════════════════════════════════════
+  1110→              MICRO-READINGS TAB
+  1111→              ═══════════════════════════════════════════════════════ */}
+  1112→          <TabsContent value="micro-readings">
+  1113→            <motion.div
+  1114→              initial={{ opacity: 0, y: 20 }}
+  1115→              animate={{ opacity: 1, y: 0 }}
+  1116→              transition={{ duration: 0.4 }}
+  1117→            >
+  1118→              <Card className="bg-[#0a0a0a] border-white/[0.04]">
+  1119→                <CardHeader>
+  1120→                  <div className="flex items-center justify-between">
+  1121→                    <div>
+  1122→                      <CardTitle className="text-editorial text-sm text-[#f0eee9] tracking-wider">
+  1123→                        MICRO-READING LEADS
+  1124→                      </CardTitle>
+  1125→                      <CardDescription className="text-body-cinematic text-xs mt-1">
+  1126→                        {microReadings.length} lead
+  1127→                        {microReadings.length !== 1 ? "s" : ""} captured
+  1128→                      </CardDescription>
+  1129→                    </div>
+  1130→                    <div className="bg-[#c9a96e]/10 border border-[#c9a96e]/20 rounded-lg px-3 py-1.5">
+  1131→                      <span className="text-[#c9a96e] text-xs font-medium">
+  1132→                        {microReadings.length} total
+  1133→                      </span>
+  1134→                    </div>
+  1135→                  </div>
+  1136→                </CardHeader>
+  1137→                <CardContent>
+  1138→                  {loading ? (
+  1139→                    <div className="space-y-3">
+  1140→                      {[...Array(5)].map((_, i) => (
+  1141→                        <Skeleton
+  1142→                          key={i}
+  1143→                          className="h-20 w-full bg-[#141414] rounded-lg"
+  1144→                        />
+  1145→                      ))}
+  1146→                    </div>
+  1147→                  ) : microReadings.length === 0 ? (
+  1148→                    <div className="text-center py-12">
+  1149→                      <Star className="size-10 text-[#333] mx-auto mb-3" />
+  1150→                      <p className="text-body-cinematic text-sm">
+  1151→                        No micro-reading leads yet
+  1152→                      </p>
+  1153→                    </div>
+  1154→                  ) : (
+  1155→                    <>
+  1156→                      {/* Desktop Table */}
+  1157→                      <div className="hidden lg:block overflow-x-auto">
+  1158→                        <Table>
+  1159→                          <TableHeader>
+  1160→                            <TableRow className="border-white/[0.04] hover:bg-transparent">
+  1161→                              <TableHead className="text-[#9a9a9a] text-xs font-medium">
+  1162→                                Email
+  1163→                              </TableHead>
+  1164→                              <TableHead className="text-[#9a9a9a] text-xs font-medium">
+  1165→                                Birth Month
+  1166→                              </TableHead>
+  1167→                              <TableHead className="text-[#9a9a9a] text-xs font-medium">
+  1168→                                Emotional Pattern
+  1169→                              </TableHead>
+  1170→                              <TableHead className="text-[#9a9a9a] text-xs font-medium">
+  1171→                                Relationship Frustration
+  1172→                              </TableHead>
+  1173→                              <TableHead className="text-[#9a9a9a] text-xs font-medium">
+  1174→                                Result Hint
+  1175→                              </TableHead>
+  1176→                              <TableHead className="text-[#9a9a9a] text-xs font-medium">
+  1177→                                Date
+  1178→                              </TableHead>
+  1179→                            </TableRow>
+  1180→                          </TableHeader>
+  1181→                          <TableBody>
+  1182→                            {microReadings.map((reading, i) => (
+  1183→                              <motion.tr
+  1184→                                key={reading.id}
+  1185→                                initial={{ opacity: 0 }}
+  1186→                                animate={{ opacity: 1 }}
+  1187→                                transition={{
+  1188→                                  duration: 0.3,
+  1189→                                  delay: i * 0.03,
+  1190→                                }}
+  1191→                                className="border-white/[0.02] hover:bg-white/[0.02] transition-colors"
+  1192→                              >
+  1193→                                <TableCell className="text-[#f0eee9] text-sm">
+  1194→                                  {reading.email}
+  1195→                                </TableCell>
+  1196→                                <TableCell className="text-body-cinematic text-xs">
+  1197→                                  {MONTH_NAMES[reading.birthMonth - 1] || reading.birthMonth}
+  1198→                                </TableCell>
+  1199→                                <TableCell className="text-body-cinematic text-xs max-w-48 truncate">
+  1200→                                  {reading.emotionalPattern}
+  1201→                                </TableCell>
+  1202→                                <TableCell className="text-body-cinematic text-xs max-w-48 truncate">
+  1203→                                  {reading.relationshipFrustration}
+  1204→                                </TableCell>
+  1205→                                <TableCell className="text-[#c9a96e] text-xs max-w-36 truncate">
+  1206→                                  {reading.resultHint}
+  1207→                                </TableCell>
+  1208→                                <TableCell className="text-body-cinematic text-xs whitespace-nowrap">
+  1209→                                  {formatDate(reading.createdAt)}
+  1210→                                </TableCell>
+  1211→                              </motion.tr>
+  1212→                            ))}
+  1213→                          </TableBody>
+  1214→                        </Table>
+  1215→                      </div>
+  1216→
+  1217→                      {/* Tablet / Mobile Cards */}
+  1218→                      <div className="lg:hidden space-y-3 max-h-[70vh] overflow-y-auto">
+  1219→                        {microReadings.map((reading, i) => (
+  1220→                          <motion.div
+  1221→                            key={reading.id}
+  1222→                            initial={{ opacity: 0, y: 10 }}
+  1223→                            animate={{ opacity: 1, y: 0 }}
+  1224→                            transition={{ duration: 0.3, delay: i * 0.04 }}
+  1225→                            className="bg-[#111]/50 border border-white/[0.04] rounded-xl p-4 space-y-3"
+  1226→                          >
+  1227→                            <div className="flex items-start justify-between">
+  1228→                              <div className="min-w-0 flex-1">
+  1229→                                <p className="text-[#f0eee9] text-sm font-medium truncate">
+  1230→                                  {reading.email}
+  1231→                                </p>
+  1232→                                <p className="text-body-cinematic text-[10px] mt-0.5">
+  1233→                                  {formatDate(reading.createdAt)}
+  1234→                                </p>
+  1235→                              </div>
+  1236→                              <Badge
+  1237→                                variant="outline"
+  1238→                                className="text-[#c9a96e] border-[#c9a96e]/20 text-[10px] ml-2"
+  1239→                              >
+  1240→                                {MONTH_NAMES[reading.birthMonth - 1] || reading.birthMonth}
+  1241→                              </Badge>
+  1242→                            </div>
+  1243→                            <div className="space-y-2">
+  1244→                              <div>
+  1245→                                <p className="text-[#555] text-[10px] uppercase tracking-wider mb-0.5">
+  1246→                                  Emotional Pattern
+  1247→                                </p>
+  1248→                                <p className="text-body-cinematic text-xs line-clamp-2">
+  1249→                                  {reading.emotionalPattern}
+  1250→                                </p>
+  1251→                              </div>
+  1252→                              <div>
+  1253→                                <p className="text-[#555] text-[10px] uppercase tracking-wider mb-0.5">
+  1254→                                  Frustration
+  1255→                                </p>
+  1256→                                <p className="text-body-cinematic text-xs line-clamp-2">
+  1257→                                  {reading.relationshipFrustration}
+  1258→                                </p>
+  1259→                              </div>
+  1260→                              <div>
+  1261→                                <p className="text-[#555] text-[10px] uppercase tracking-wider mb-0.5">
+  1262→                                  Result Hint
+  1263→                                </p>
+  1264→                                <p className="text-[#c9a96e] text-xs line-clamp-2">
+  1265→                                  {reading.resultHint}
+  1266→                                </p>
+  1267→                              </div>
+  1268→                            </div>
+  1269→                          </motion.div>
+  1270→                        ))}
+  1271→                      </div>
+  1272→                    </>
+  1273→                  )}
+  1274→                </CardContent>
+  1275→              </Card>
+  1276→            </motion.div>
+  1277→          </TabsContent>
+  1278→        </Tabs>
+  1279→      </main>
+  1280→
+  1281→      {/* ─── Footer ──────────────────────────────────────────────── */}
+  1282→      <footer className="border-t border-white/[0.04] mt-12">
+  1283→        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+  1284→          <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
+  1285→            <div className="flex items-center gap-2">
+  1286→              <Star className="size-3 text-[#c9a96e]" />
+  1287→              <p className="text-body-cinematic text-[10px]">
+  1288→                AstroKalki Admin Dashboard
+  1289→              </p>
+  1290→            </div>
+  1291→            <p className="text-[#333] text-[10px]">
+  1292→              Sacred pattern recognition platform
+  1293→            </p>
+  1294→          </div>
+  1295→        </div>
+  1296→      </footer>
+  1297→    </div>
+  1298→  );
+  1299→}
+  1300→

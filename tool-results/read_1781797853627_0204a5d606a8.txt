@@ -1,0 +1,193 @@
+  1350→        full JSON payload ✓
+  1351→      - GET /admin/analytics WITH cookie → 200, 125KB HTML ✓
+  1352→      - GET /admin WITH cookie → 200, contains new Analytics link ✓
+  1353→  * Verified response shape via python json inspection:
+  1354→      - range: dict {days, from, to}
+  1355→      - funnel: list of 6 steps (each with step, label, count,
+  1356→        conversionRate, stepRate, dropoffRate)
+  1357→      - timeseries: list of 30 daily points
+  1358→      - topPages: list (up to 10)
+  1359→      - topEvents: list (all event types, sorted)
+  1360→      - sessions: {total, unique, avgEventsPerSession}
+  1361→      - byHour: list of 24 hourly buckets
+  1362→  * Seeded 250 realistic analytics events through the public
+  1363→    /api/analytics endpoint to verify the dashboard renders with
+  1364→    data (varied event types, pages, sessionIds). Confirmed funnel
+  1365→    shows realistic numbers (section_view 133 → micro_reading 28 →
+  1366→    booking_complete 31 → newsletter_signup 11), top pages sorted
+  1367→    correctly, sessions computed properly.
+  1368→  * Rendered page contains all key UI markers: "Behaviour &
+  1369→    conversion", "Conversion Funnel", "Activity Over Time",
+  1370→    "Top Pages", "Event Inventory", "Total Events", "Unique
+  1371→    Sessions", "Avg Events / Session", all 6 funnel step labels,
+  1372→    all 3 range selector options (7/30/90 Days), recharts container
+  1373→    div present (client-side hydrated).
+  1374→  * Zero "Application error" / "TypeError" / "ReferenceError"
+  1375→    markers in the rendered HTML.
+  1376→
+  1377→Stage Summary:
+  1378→- Analytics dashboard is production-ready. Three new files:
+  1379→  /src/app/api/admin/analytics/route.ts (aggregated events API)
+  1380→  /src/app/admin/analytics/page.tsx (server-component shell)
+  1381→  /src/app/admin/analytics/AnalyticsDashboard.tsx (client component
+  1382→  with recharts visualisations)
+  1383→- One file modified: /src/app/admin/page.tsx (added Analytics nav
+  1384→  button to header — single new button, no restructuring).
+  1385→- Auth model: zero-touch. The existing /src/middleware.ts auto-guards
+  1386→  both /admin/analytics (redirect to login) and /api/admin/analytics
+  1387→  (401 JSON). No manual session checking needed in the route handler
+  1388→  or page.
+  1389→- Design: strict AstroKalki dark editorial palette. Background #050505,
+  1390→  gold #c9a96e + 3 derivative tones, dark grid #2a2a2a, muted axis
+  1391→  #7a7a7a. ZERO blue/indigo anywhere. Typography uses Cinzel
+  1392→  (eyebrows/titles), Playfair (editorial headlines), Geist Mono
+  1393→  (numbers), and the existing text-body-cinematic helper for body
+  1394→  text. Cards use bg-white/[0.015] + border-white/[0.04] + p-6/p-8.
+  1395→  Section eyebrows are 11px Cinzel uppercase tracking-[0.3em] gold.
+  1396→- Charts: 2 recharts visualisations (AreaChart for timeseries,
+  1397→  BarChart for by-hour) + 1 custom div-based funnel (better visual
+  1398→  control than a BarChart for the conversion flow). All wrapped in
+  1399→  ResponsiveContainer with explicit heights — responsive on mobile.
+  1400→  Custom dark-themed tooltip. Cell-based colour intensity on the
+  1401→  by-hour bars highlights peak hours.
+  1402→- Robustness: empty states for every section (renders cleanly when
+  1403→  no events exist), error state with retry, loading skeleton during
+  1404→  fetch, animated range selector, refresh button.
+  1405→- Forward-compatible: micro_reading_complete is derived from the
+  1406→  JSON `data` payload of micro_reading events (the public analytics
+  1407→  API validates against a fixed event enum that doesn't include
+  1408→  "micro_reading_complete", so we parse the payload for
+  1409→  complete===true | step==='complete'). This means the funnel will
+  1410→  populate correctly once the tracking layer starts sending
+  1411→  micro_reading events with the completion flag.
+  1412→- Zero TS / lint regressions. All 11 TS errors and 21 lint errors
+  1413→  remaining are pre-existing in other agents' files (Stripe type
+  1414→  mismatches, react-hooks/set-state-in-effect in pre-existing
+  1415→  page.tsx / footer.tsx / insights.tsx). None are in my files.
+  1416→- The dashboard is reachable from the admin home page header
+  1417→  (gold "Analytics" button with BarChart3 icon, sits next to the
+  1418→  existing "View Site" button). The /admin/analytics URL also
+  1419→  works directly via the middleware-redirect login flow.
+  1420→
+  1421→---
+  1422→Task ID: M3-a
+  1423→Agent: full-stack-developer
+  1424→Task: Self-serve booking calendar with slot picker — replace the "capture intake → hand off to WhatsApp" flow with an actual calendar slot picker. Users browse available time slots, pick one, and book it directly. Admins create availability slots (single + bulk generation).
+  1425→
+  1426→Work Log:
+  1427→- Read worklog.md (especially UPGRADE-M1 schema prep + AUTHORITY-WEBSITE-EXPANSION design context) and confirmed AvailabilitySlot model + Booking.scheduledAt/slotId already prepped in schema.prisma; middleware.ts already whitelists /api/slots for public POST.
+  1428→- Read existing files to match conventions: /api/bookings/route.ts (intake payload + email shape + rate-limit pattern), /lib/security/{validation,rate-limit,honeypot,auth}.ts (bookingInputSchema + RATE_LIMITS + honeypotSuccessResponse + getClientIp + checkRateLimit), /lib/email.ts (sendEmail + notifyAdmin), /lib/i18n.ts (en + hi booking.* keys), /components/astrokalki/booking.tsx (4-step flow with framer-motion step transitions + useI18n + minimal progress indicator 01-02-03-04), /app/admin/leads/page.tsx + /app/admin/patterns/page.tsx (visual style for admin pages: bg #050505, gold #c9a96e, serif headers, lucide icons, StatCard pattern, sticky header, mt-auto footer).
+  1429→- Added 19 new i18n keys to /src/lib/i18n.ts in BOTH en and hi sections: booking.step.slot (Schedule / समय), booking.slotTitle, booking.slotSubtitle, booking.slotLoading, booking.slotEmpty, booking.slotEmptyHint, booking.slotEmptyCta, booking.slotRetry, booking.slotRetryBtn, booking.slotSelected, booking.slotFallbackCta, booking.confirmSlot, booking.confirmSlotNone, booking.finalizeBooking, booking.submitting, booking.bookingSuccessTitle, booking.bookingSuccessBody, booking.bookingError, booking.whatsappDirect.
+  1430→- Created /src/app/api/slots/route.ts — PUBLIC GET only. Returns slots where status='open' and start >= now, filtered by ?duration=30|60|90 if provided, optional ?from / ?to ISO bounds, hard cap at 200 rows / 90-day window (extends to whatever `to` is provided up to 365 days). Rate-limited at 60/min/IP using RATE_LIMITS.api preset. Ordered by start asc.
+  1431→- Created /src/app/api/slots/[id]/route.ts:
+  1432→    GET  — Public. Returns single slot's details (for preview before booking). Includes bookingId for linking.
+  1433→    POST — Public. Books a specific slot. Reuses bookingInputSchema from /lib/security/validation.ts (same intake contract as /api/bookings: name, email, phone, duration, price, contexts, birthDate/Time/Place, message, referredBy, website honeypot). Validations: rate-limit 3/hour/IP (RATE_LIMITS.bookings), 4KB body cap, honeypot `website` silent-success for bots, Zod validation. Atomic slot reservation via db.$transaction: verifies slot exists + status='open' + duration matches + not in past → creates Booking with scheduledAt=slot.start + slotId=slot.id + status='pending' → marks slot status='booked' + links bookingId. Sends confirmation emails (user + admin) with session time formatted in IST. Returns friendly errors for SLOT_NOT_FOUND (404), SLOT_NOT_OPEN (409 — "This slot was just taken"), SLOT_DURATION_MISMATCH (400), SLOT_IN_PAST (400).
+  1434→- Created /src/app/api/admin/slots/route.ts — admin-gated by middleware. GET: paginated list with optional ?status=open|held|booked filter, includes linked booking summary. POST: discriminated-union Zod schema for two modes:
+  1435→    • single: { mode:'single', start:ISO, end:ISO, duration:30|60|90 }
+  1436→    • bulk:   { mode:'bulk', startDate:'YYYY-MM-DD', endDate:'YYYY-MM-DD', weekdays:[0-6], times:['HH:mm'], duration, timezoneOffset:minutes }
+  1437→  Bulk generation: iterates each day in [startDate, endDate] (capped at 366 days), filters by weekday (using UTC day), generates one slot per (day × time) combo, computes UTC start as Date.UTC(y,m,d,h,mi) - offsetMinutes*60000 (so 10:00 IST = 04:30 UTC), end = start + duration*60000. Skips past slots. De-duplicates against existing slots with same start time. Uses createMany for performance.
+  1438→- Created /src/app/api/admin/slots/[id]/route.ts — admin-gated. PATCH: updates status (open|held|booked) and/or reschedules (start/end ISO), with consistency rules (can't mark 'booked' without a bookingId; releasing a 'booked' slot back to 'open' clears the booking link). DELETE: only deletes slots with status='open' (returns 409 if held/booked — those must be cancelled via the booking flow).
+  1439→- Created /src/app/admin/slots/page.tsx — server component. Direct DB read (auth already enforced by middleware on /admin/* path). Renders: sticky header (back-link to /admin, refresh), title block (eyebrow "Admin · Schedule", serif H1 "Availability calendar", body description), 6 StatTiles (Total / Open / Booked / Held / Upcoming / Past), SlotManager component, SlotList component, footer hint "Times shown in IST". Uses dynamic='force-dynamic' to always show latest slot state. Serializes Date objects to ISO strings before passing to client components.
+  1440→- Created /src/app/admin/slots/SlotManager.tsx — client component. Collapsible generator panel with mode toggle (Bulk / Single). Bulk form: start date, end date, weekday multi-select (Sun-Sat chips), time-of-day multi-input (HH:mm with add/remove), duration dropdown (30/60/90), timezone preset dropdown (IST/UTC/PST/EST/CET). Single form: datetime-local input + shared duration + timezone. Submit POSTs to /api/admin/slots. On success: shows summary (count + skipped duplicates), calls router.refresh() so server-rendered grid updates. Framer-motion height animation for the collapsible.
+  1441→- Created /src/app/admin/slots/SlotList.tsx — client component. Receives initial slots as props (server-rendered). Filter tabs (All/Open/Held/Booked with counts). Groups slots by IST calendar day with Cinzel-uppercase day headers + thin gold dividers. Each slot row shows: time range (mono font), duration, status (with Circle/CheckCircle2/Clock icon, gold for booked, emerald for open, yellow for held, "past" tag for ended slots), booking link (if booked, shows name + email with ExternalLink icon linking to /admin), delete button (only for open + non-past slots). Delete: confirm dialog → DELETE /api/admin/slots/[id] → router.refresh(). Custom thin scrollbar styling.
+  1442→- Modified /src/components/astrokalki/booking.tsx — added slot picker as step 2 of the new 5-step flow. New flow: 0=Landing, 1=Duration, 2=Slot picker (NEW), 3=Context (was 2), 4=Details (was 3), 5=Confirm (was 4). Minimal progress indicator now shows 5 numbered dots (01-02-03-04-05) with the same thin-line style. Slot picker fetches /api/slots?duration=<selected> on step entry (cached per duration), displays loading/error/empty states. Empty state shows message + "Request a time directly" skip button (sets skippedSlot=true → falls back to WhatsApp path). Slots grouped by date with Cinzel uppercase day headers + thin gold dividers; time slots in 2-3 column grid as borderless cards with bottom underline on hover; selected slot has gold border-bottom + bg tint. Selected slot chip + "skip" link shown below the grid. On final submit (step 5): if selectedSlot, POSTs to /api/slots/[selectedSlot.id] with full intake payload; shows success state with date/time confirmation card; if skipped (no slot), falls back to original WhatsApp flow (POST /api/bookings + openWhatsApp). Honeypot `website:''` field included in both paths. Booking success state has "back to start" reset button. All state (selectedSlot, skippedSlot, slotsLoading, slotsError, submitting, bookingSuccess, bookingError) managed via useState. Framer-motion AnimatePresence for step transitions preserved.
+  1443→- Verification: 
+  1444→    • npx tsc --noEmit: 0 errors in any of my new/modified files. (11 pre-existing errors in /api/stripe/* routes — not introduced by this task.)
+  1445→    • bun run lint: 0 errors in my files. (Pre-existing errors in /src/app/page.tsx:32, /src/components/astrokalki/footer.tsx:10, /src/components/astrokalki/insights.tsx:81 — all in MUST-NOT-TOUCH list — and in /workspace-analysis/extracted/* which is not part of the live app.)
+  1446→    • End-to-end smoke test (via curl with X-Forwarded-For to bypass rate limit): seeded a slot directly via Prisma → GET /api/slots?duration=60 returns the slot → POST /api/slots/[id] with full intake returns 201 + booking object with scheduledAt=slot.start, slotId=slot.id, status='pending', slot marked 'booked' + bookingId linked → second POST to same slot returns 409 "This slot was just taken" (atomic transaction prevents double-booking) → GET /api/slots no longer shows the booked slot (filtered by status='open') → GET /api/slots/[id] shows booked slot with bookingId linked. Honeypot triggered (website='http://spam.com') returns fake 201 success. Test data cleaned up afterward.
+  1447→    • /admin/slots returns 307 redirect to /admin/login (middleware correctly gates admin pages).
+  1448→    • /api/admin/slots returns 401 (middleware correctly gates admin API).
+  1449→
+  1450→Stage Summary:
+  1451→- 7 new files + 2 modified files produced:
+  1452→    NEW /src/app/api/slots/route.ts                          (public GET, 60/min rate limit)
+  1453→    NEW /src/app/api/slots/[id]/route.ts                     (GET single + POST book, 3/hour rate limit, atomic transaction, confirmation emails)
+  1454→    NEW /src/app/api/admin/slots/route.ts                    (admin GET list + POST single/bulk create with timezone-aware slot generation)
+  1455→    NEW /src/app/api/admin/slots/[id]/route.ts               (admin PATCH status/reschedule + DELETE open-only)
+  1456→    NEW /src/app/admin/slots/page.tsx                        (server component, direct DB read, stats + SlotManager + SlotList)
+  1457→    NEW /src/app/admin/slots/SlotManager.tsx                 (client component, bulk + single generator, framer-motion collapsible)
+  1458→    NEW /src/app/admin/slots/SlotList.tsx                    (client component, filter tabs + date-grouped grid + delete actions)
+  1459→    MODIFIED /src/components/astrokalki/booking.tsx          (5-step flow with slot picker as step 2, self-serve POST + WhatsApp fallback)
+  1460→    MODIFIED /src/lib/i18n.ts                                (19 new booking.* keys in en + hi)
+  1461→- Self-serve booking calendar fully functional end-to-end: admins generate slots → users browse → users book directly (no WhatsApp hand-off needed) → confirmation emails dispatched → slot marked booked → double-booking impossible (atomic transaction).
+  1462→- WhatsApp flow preserved as graceful fallback: when no slots are available (or user clicks "skip"), the original WhatsApp hand-off path runs unchanged.
+  1463→- Visual language matches existing cinematic editorial design: bg #050505, gold #c9a96e, Playfair serif headlines, Cinzel editorial labels, Inter body, numbered steps 01-02-03-04-05 with thin gold dividers, borderless slot cards with bottom underline on hover, mono time slots, gold border on selected.
+  1464→- Admin /admin/slots page matches the visual style of /admin/leads + /admin/patterns: sticky header with back-link, eyebrow + serif H1 title, StatTile cards, bordered sections, mt-auto sticky footer.
+  1465→- 0 TS errors + 0 lint errors in any of the new/modified files. 11 pre-existing TS errors in /api/stripe/* (unrelated, untouched). End-to-end smoke test confirmed: slot creation → public listing → atomic booking → double-booking prevention → status transitions → honeypot silent success.
+  1466→
+  1467→---
+  1468→Task ID: M2-e+M3-b
+  1469→Agent: full-stack-developer
+  1470→Task: Implement Stripe-powered membership subscription checkout + a member portal at /account. Combines two milestones: (1) Stripe Checkout for monthly/yearly membership subscriptions, (2) NextAuth magic-link auth + member portal showing membership status, Stripe Billing Portal access, session history, and drip email preferences.
+  1471→
+  1472→Work Log:
+  1473→- Read /home/z/my-project/worklog.md (full 1465-line history) to absorb the AstroKalki design system, the security conventions established in Task 8/9, and the UPGRADE-M1 schema prep that pre-created Membership/User/Account/Session/VerificationToken models for this work.
+  1474→- Read /src/middleware.ts to confirm /api/auth/* and /api/stripe/webhook are whitelisted from public-POST guards (bot UA + body cap + Origin check) — verified Stripe webhook gets 64KB body cap, all other public POSTs get 4KB.
+  1475→- Read /src/lib/security/{rate-limit,validation,honeypot}.ts + /src/lib/email.ts + /src/lib/db.ts + /src/app/services/page.tsx + /src/app/patterns/atlas/page.tsx to match existing patterns and the dark editorial visual language.
+  1476→- Created /src/lib/auth.ts — NextAuth v4 config using PrismaAdapter(db) + EmailProvider with a custom sendVerificationRequest that calls the existing sendEmail() helper so the magic-link email uses the branded AstroKalki HTML template (dark bg #070707, gold accent #a58a54, Georgia serif, signed 24-hour token). Session strategy: database. Pages: signIn/signOut/error/verifyRequest all → /account. Session callback attaches user.id to the session object for server-side use.
+  1477→- Created /src/app/api/auth/[...nextauth]/route.ts — standard NextAuth route handler (`const handler = NextAuth(authOptions); export { handler as GET, handler as POST };`).
+  1478→- Created /src/app/api/stripe/checkout/route.ts — POST endpoint with layered defense: (1) rate limit reusing RATE_LIMITS.bookings preset, (2) 4KB body cap, (3) honeypot silent-success for bots, (4) Zod validation (plan: 'monthly'|'yearly', optional email with .con/.cm typo guard, honeypot), (5) env-var guard returning 503 if STRIPE_PRICE_MONTHLY/YEARLY not set, (6) Stripe Checkout Session creation with mode=subscription, success_url=/account?status=success, cancel_url=/membership?status=cancelled, customer_email + metadata if provided, allow_promotion_codes enabled. Returns {url} for top-level browser navigation.
+  1479→- Created /src/app/api/stripe/webhook/route.ts — POST handler that verifies Stripe signature using STRIPE_WEBHOOK_SECRET + raw body (request.text()). Handles three events: (a) checkout.session.completed → upserts Membership with status=active, infers plan from price.recurring.interval, reads current_period_end from subscription.items.data[0] (Stripe API v22 moved this off Subscription to SubscriptionItem), links to NextAuth user by email if one exists; (b) customer.subscription.updated → syncs status/period/cancel flag; (c) customer.subscription.deleted → marks Membership expired (row preserved for history). All non-2xx returns trigger Stripe retry. Helper functions: asSubscription (type narrowing), mapStatus (active/trialing/past_due → active; canceled → expired; else → expired), getCurrentPeriodEnd (reads from items.data[0]), getInterval (reads price.recurring.interval), upsertMembership (lookup by subscriptionId OR customerId OR email, then update-or-create).
+  1480→- Created /src/app/api/stripe/portal/route.ts — POST auth-gated endpoint that creates a Stripe Billing Portal session for the signed-in member. Returns {url} with return_url=/account?status=portal. 401 if no session, 404 if no membership or no stripeCustomerId on the membership row.
+  1481→- Created /src/app/api/stripe/usage/route.ts — GET auth-gated endpoint returning the signed-in user's membership + recent bookings (last 12) + newsletter/drip preferences. Used by /account page for client-side refresh after Stripe redirects. 401 if no session.
+  1482→- Created /src/app/api/preferences/route.ts — POST auth-gated endpoint for updating drip email preferences (prefSessions/prefBlog/prefDrip booleans) on the Newsletter row. Rate-limited (20/hour per IP), Zod-validated, upserts the Newsletter row if the user is signed in but never subscribed. Middleware has /api/preferences on the public-POST-API whitelist so bot UA + Origin check apply.
+  1483→- Created /src/components/astrokalki/subscribe-button.tsx — client component for the /membership pricing page. Shows inline email field if no defaultEmail (signed-out user), hides it if signed in (with a "Use a different email" toggle). POSTs to /api/stripe/checkout with honeypot field, redirects window.location.href to the returned Stripe URL. Loading + error states.
+  1484→- Created /src/components/astrokalki/sign-in-form.tsx — client component for the /account signed-out state. Fetches /api/auth/csrf, then POSTs to /api/auth/signin/email with email + csrfToken + callbackUrl=/account. Shows "Check your inbox" state after the request. Includes honeypot field.
+  1485→- Created /src/components/astrokalki/sign-out-button.tsx — client component that POSTs to /api/auth/signout with csrfToken, then router.refresh() to flip the /account page back to signed-out state.
+  1486→- Created /src/components/astrokalki/portal-link.tsx — client component that POSTs to /api/stripe/portal and redirects window.location.href to the returned Stripe Billing Portal URL. Loading + error states.
+  1487→- Created /src/components/astrokalki/preferences-form.tsx — client component rendering three toggle switches (prefSessions/prefBlog/prefDrip). Optimistic UI: switch flips instantly, rolls back on error. Each toggle POSTs individually to /api/preferences.
+  1488→- Created /src/app/membership/page.tsx — public pricing page (server component) with two plans (Monthly ₹999, Yearly ₹9999) rendered as editorial rows matching /services visual language (Roman numerals I/II, gold #c9a96e, Playfair Display serif, generous py-12 sm:py-16 row padding). Reads NextAuth session to: (a) pre-fill the SubscribeButton email when signed in, (b) render an "Already a member" panel linking to /account when the user has an active membership. Includes "What's inside" section explaining the four membership benefits (monthly sessions, recording archive, Pattern Atlas access, priority booking), a 6-question FAQ, OfferCatalog JSON-LD schema with INR pricing + ISO 8601 billing durations (P1M/P1Y), Breadcrumbs, and canonical + OpenGraph + Twitter metadata.
+  1489→- Created /src/app/account/page.tsx — member portal (server component). Two states: (a) signed-out renders SignInForm with "Not a member yet?" link to /membership; (b) signed-in renders four Roman-numeral-numbered sections: I. Membership status (plan/status/period-end/member-since grid + cancel-at-period warning or re-subscribe CTA), II. Subscription management (PortalLink, only if active), III. Session history (recent bookings with status/price/focus-areas tags), IV. Email preferences (PreferencesForm). Reads everything via parallel Promise.all on db.membership + db.booking + db.newsletter. Includes SignOutButton in the header. metadata.robots = noindex,nofollow.
+  1490→- Modified /src/components/astrokalki/membership-tiers.tsx — replaced the onClick→openWhatsApp handler with a Next.js Link to /membership for all three tier CTAs. Removed the openWhatsApp import. Visual styling of the CTA preserved exactly (gold underline text-link with → arrow, hover transitions).
+  1491→- Encountered + fixed TypeScript errors during integration:
+  1492→  * Stripe SDK v22 has no `Stripe.LatestApiVersion` type export — removed the apiVersion pin from all three Stripe route handlers. The SDK uses its own default version, which keeps the TS types in lockstep with API responses.
+  1493→  * Stripe API v22 moved `current_period_end` and `current_period_start` from Subscription to SubscriptionItem. Wrote a `getCurrentPeriodEnd()` helper that reads `subscription.items.data[0]?.current_period_end` defensively.
+  1494→- Verification:
+  1495→  * `npx tsc --noEmit` exits 0 (zero TS errors in any file).
+  1496→  * `bun run lint` reports zero errors in any new file. (2 pre-existing errors in footer.tsx + insights.tsx are unrelated.)
+  1497→  * `curl http://localhost:3000/membership` → HTTP 200, 129KB rendered HTML containing all key UI markers: "Two doors", "Same work. Different cadence", "The four things membership gives you", "Start Monthly", "Go Annual", "₹999", "₹9,999", "Most chosen", "recording archive", "Pattern Atlas access", "priority booking", "Common questions", "Cancel anytime".
+  1498→  * `curl http://localhost:3000/account` → HTTP 200, 55KB rendered HTML containing all signed-out markers: "Sign in to your account", "Member portal", "Your email", "Send sign-in link", "Not a member yet?", "See membership options", "one-time sign-in link".
+  1499→  * `curl http://localhost:3000/api/auth/csrf` → HTTP 200, returns valid CSRF token.
+  1500→  * `curl http://localhost:3000/api/auth/providers` → HTTP 200, returns `{"email":{"id":"email","name":"Email","type":"email",...}}` — confirms NextAuth is initialized with the Email provider.
+  1501→  * `curl -X POST /api/stripe/checkout -d '{"plan":"monthly","email":"test@example.com"}'` → HTTP 503 "Membership pricing is not configured" (expected — STRIPE_PRICE_MONTHLY not set in dev env).
+  1502→  * `curl -X POST /api/stripe/checkout -d '{"plan":"bogus"}'` → HTTP 400 "plan: plan must be 'monthly' or 'yearly'" (Zod validation working).
+  1503→  * `curl -X POST /api/stripe/checkout -d '{"plan":"monthly","email":"x@y.com","website":"bot-spam"}'` → HTTP 200 with fake URL "/membership" (honeypot silent-success working — bots think they won, no DB write).
+  1504→  * `curl -X POST /api/stripe/portal` (no session) → HTTP 401 "Sign in required to manage your subscription."
+  1505→  * `curl /api/stripe/usage` (no session) → HTTP 401 "Sign in required."
+  1506→  * `curl -X POST /api/preferences` with browser UA (no session) → HTTP 401 "Sign in required to manage preferences."
+  1507→  * `curl -X POST /api/preferences` with curl UA → HTTP 403 "Request blocked" (middleware bot-UA block fires before route handler).
+  1508→- Dev server healthy on port 3000 throughout — no crashes, no compile errors in dev.log.
+  1509→
+  1510→Stage Summary:
+  1511→- Two new public routes shipped:
+  1512→  * /membership — editorial pricing page with two plans (₹999/month, ₹9999/year), Stripe Checkout integration, OfferCatalog JSON-LD with INR pricing + P1M/P1Y billing durations. Visually indistinguishable from the existing /services / /patterns/atlas / /insights routes (same dark editorial design system).
+  1513→  * /account — member portal with two states: signed-out (magic-link sign-in form) and signed-in (4 numbered sections: membership status, subscription management, session history, email preferences).
+  1514→- Five new API routes shipped:
+  1515→  * /api/auth/[...nextauth] — NextAuth v4 handler (database session strategy, EmailProvider with branded magic-link HTML email via existing sendEmail()).
+  1516→  * /api/stripe/checkout — POST. Public (rate-limited, Zod-validated, honeypot-guarded). Creates Stripe Checkout Session, returns {url}.
+  1517→  * /api/stripe/webhook — POST. Stripe signature-verified. Handles checkout.session.completed, customer.subscription.updated, customer.subscription.deleted. Membership row upserted/updated/expired across the subscription lifecycle.
+  1518→  * /api/stripe/portal — POST. Auth-gated. Creates Stripe Billing Portal session, returns {url}.
+  1519→  * /api/stripe/usage — GET. Auth-gated. Returns current user's membership + recent bookings + newsletter preferences.
+  1520→  * /api/preferences — POST. Auth-gated. Updates drip email preferences on the Newsletter row.
+  1521→- Five new client components shipped:
+  1522→  * subscribe-button.tsx — Stripe Checkout launcher with inline email field
+  1523→  * sign-in-form.tsx — NextAuth magic-link sign-in form
+  1524→  * sign-out-button.tsx — NextAuth sign-out button
+  1525→  * portal-link.tsx — Stripe Billing Portal launcher
+  1526→  * preferences-form.tsx — Drip email preferences toggle form with optimistic UI
+  1527→- One existing component modified:
+  1528→  * membership-tiers.tsx — CTAs now link to /membership instead of opening WhatsApp. Visual styling preserved.
+  1529→- Schema: zero changes (UPGRADE-M1 pre-prepared all required models: Membership with stripeCustomerId/stripeSubscriptionId/currentPeriodEnd/cancelAtPeriodEnd/userId; User/Account/Session/VerificationToken for NextAuth Prisma adapter; Newsletter with prefSessions/prefBlog/prefDrip for the preference center).
+  1530→- Security posture:
+  1531→  * /api/stripe/checkout: rate-limited (bookings preset, 3/hour per IP — conservative for a payment endpoint) + honeypot + Zod + 4KB body cap (middleware) + 503 fallback if Stripe env not configured.
+  1532→  * /api/stripe/webhook: signature-verified (no cookie/origin check needed) + 64KB body cap (middleware whitelist).
+  1533→  * /api/stripe/portal, /api/stripe/usage, /api/preferences: auth-gated by NextAuth database session. SameSite=Lax cookies + middleware Origin check = CSRF defense.
+  1534→  * All routes bypassed by middleware for /api/auth/* (NextAuth has its own CSRF defense).
+  1535→- Design system adherence: bg #050505, gold #c9a96e, text #f0eee9/#9a9a9a/#7a7a7a, Playfair Display serif for headlines, Cinzel-free editorial labels (tracking-[0.4em] uppercase), Roman numerals I/II/III/IV for section numbering on /account, generous whitespace (py-12 sm:py-16 row padding, py-32 sm:py-48 section padding on /membership hero), text-link CTAs with gold underline + → arrow (no boxed buttons), NO indigo/blue colors anywhere.
+  1536→- Operational requirements:
+  1537→  * Production MUST set STRIPE_SECRET_KEY, STRIPE_PUBLISHABLE_KEY, STRIPE_WEBHOOK_SECRET, STRIPE_PRICE_MONTHLY, STRIPE_PRICE_YEARLY (currently blank in dev — /api/stripe/checkout returns 503, /api/stripe/webhook returns 500).
+  1538→  * Production MUST configure STRIPE_WEBHOOK_SECRET to match the webhook endpoint configured in the Stripe dashboard (events: checkout.session.completed, customer.subscription.updated, customer.subscription.deleted).
+  1539→  * Production MUST set SMTP_HOST/SMTP_USER/SMTP_PASS for magic-link emails to actually dispatch (currently falls back to console logging via sendEmail() — the dev.log will show the magic link).
+  1540→  * NEXTAUTH_URL must be the production URL (already in .env as https://astrokalki.com).
+  1541→  * NEXT_PUBLIC_SITE_URL must be the production URL (used for Stripe success/cancel/return URLs).
+  1542→

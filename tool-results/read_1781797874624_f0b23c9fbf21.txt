@@ -1,0 +1,726 @@
+     1→     1→"use client";
+     2→     2→
+     3→     3→import { useState, useEffect, useCallback } from "react";
+     4→     4→import { motion, AnimatePresence } from "framer-motion";
+     5→     5→import { openWhatsApp } from "@/lib/whatsapp";
+     6→     6→import { useI18n } from "@/lib/i18n-context";
+     7→     7→
+     8→     8→const durationKeys = [
+     9→     9→  { value: "30", labelKey: "booking.duration30", sublabelKey: "booking.duration30sub", price: "₹1,499" },
+    10→    10→  { value: "60", labelKey: "booking.duration60", sublabelKey: "booking.duration60sub", price: "₹1,999", recommended: true },
+    11→    11→  { value: "90", labelKey: "booking.duration90", sublabelKey: "booking.duration90sub", price: "₹2,999" },
+    12→    12→];
+    13→    13→
+    14→    14→const contextKeys = [
+    15→    15→  "booking.ctx1", "booking.ctx2", "booking.ctx3", "booking.ctx4",
+    16→    16→  "booking.ctx5", "booking.ctx6", "booking.ctx7", "booking.ctx8",
+    17→    17→];
+    18→    18→
+    19→    19→// ─── Slot types ──────────────────────────────────────────────────
+    20→    20→
+    21→    21→interface Slot {
+    22→    22→  id: string;
+    23→    23→  start: string; // ISO
+    24→    24→  end: string;   // ISO
+    25→    25→  duration: number;
+    26→    26→  status: string;
+    27→    27→}
+    28→    28→
+    29→    29→const STEPS = [
+    30→    30→  { id: 1, labelKey: "booking.step.duration" },
+    31→    31→  { id: 2, labelKey: "booking.step.slot" },
+    32→    32→  { id: 3, labelKey: "booking.step.context" },
+    33→    33→  { id: 4, labelKey: "booking.step.details" },
+    34→    34→  { id: 5, labelKey: "booking.step.confirm" },
+    35→    35→];
+    36→    36→
+    37→    37→// ─── Date / time formatting helpers (render in IST) ─────────────
+    38→    38→
+    39→    39→function formatSlotTime(iso: string): string {
+    40→    40→  return new Date(iso).toLocaleTimeString("en-US", {
+    41→    41→    hour: "2-digit",
+    42→    42→    minute: "2-digit",
+    43→    43→    hour12: true,
+    44→    44→    timeZone: "Asia/Kolkata",
+    45→    45→  });
+    46→    46→}
+    47→    47→
+    48→    48→function formatDateLong(iso: string): string {
+    49→    49→  return new Date(iso).toLocaleDateString("en-US", {
+    50→    50→    weekday: "long",
+    51→    51→    month: "long",
+    52→    52→    day: "numeric",
+    53→    53→    timeZone: "Asia/Kolkata",
+    54→    54→  });
+    55→    55→}
+    56→    56→
+    57→    57→function formatDateShort(iso: string): string {
+    58→    58→  return new Date(iso).toLocaleDateString("en-US", {
+    59→    59→    weekday: "short",
+    60→    60→    month: "short",
+    61→    61→    day: "numeric",
+    62→    62→    timeZone: "Asia/Kolkata",
+    63→    63→  });
+    64→    64→}
+    65→    65→
+    66→    66→function dateGroupKey(iso: string): string {
+    67→    67→  const d = new Date(iso);
+    68→    68→  const ist = new Date(d.getTime() + 330 * 60_000);
+    69→    69→  return `${ist.getUTCFullYear()}-${String(ist.getUTCMonth() + 1).padStart(2, "0")}-${String(ist.getUTCDate()).padStart(2, "0")}`;
+    70→    70→}
+    71→    71→
+    72→    72→// ─── Component ───────────────────────────────────────────────────
+    73→    73→
+    74→    74→export default function Booking() {
+    75→    75→  const [step, setStep] = useState(0);
+    76→    76→  const [selectedDuration, setSelectedDuration] = useState<string | null>(null);
+    77→    77→  const [selectedSlot, setSelectedSlot] = useState<Slot | null>(null);
+    78→    78→  const [skippedSlot, setSkippedSlot] = useState(false);
+    79→    79→  const [selectedContexts, setSelectedContexts] = useState<string[]>([]);
+    80→    80→  const [formData, setFormData] = useState({
+    81→    81→    name: "", email: "", phone: "", birthDate: "", birthTime: "", birthPlace: "", message: "",
+    82→    82→  });
+    83→    83→  const { t } = useI18n();
+    84→    84→
+    85→    85→  const [slots, setSlots] = useState<Slot[]>([]);
+    86→    86→  const [slotsLoading, setSlotsLoading] = useState(false);
+    87→    87→  const [slotsError, setSlotsError] = useState<string | null>(null);
+    88→    88→  const [slotsFetchedFor, setSlotsFetchedFor] = useState<string | null>(null);
+    89→    89→
+    90→    90→  const [submitting, setSubmitting] = useState(false);
+    91→    91→  const [bookingSuccess, setBookingSuccess] = useState(false);
+    92→    92→  const [bookingError, setBookingError] = useState<string | null>(null);
+    93→    93→
+    94→    94→  const toggleContext = (ctx: string) => {
+    95→    95→    setSelectedContexts((prev) =>
+    96→    96→      prev.includes(ctx) ? prev.filter((c) => c !== ctx) : [...prev, ctx]
+    97→    97→    );
+    98→    98→  };
+    99→    99→
+   100→   100→  const fetchSlots = useCallback(async (duration: string) => {
+   101→   101→    setSlotsLoading(true);
+   102→   102→    setSlotsError(null);
+   103→   103→    try {
+   104→   104→      const res = await fetch(`/api/slots?duration=${duration}`, { cache: "no-store" });
+   105→   105→      if (!res.ok) throw new Error("fetch failed");
+   106→   106→      const data = await res.json();
+   107→   107→      setSlots(data.slots || []);
+   108→   108→      setSlotsFetchedFor(duration);
+   109→   109→    } catch {
+   110→   110→      setSlotsError(t("booking.slotRetry"));
+   111→   111→      setSlots([]);
+   112→   112→    } finally {
+   113→   113→      setSlotsLoading(false);
+   114→   114→    }
+   115→   115→  }, [t]);
+   116→   116→
+   117→   117→  // Whenever we enter the slot-picker step, fetch slots for the chosen duration.
+   118→   118→  useEffect(() => {
+   119→   119→    if (step === 2 && selectedDuration && slotsFetchedFor !== selectedDuration) {
+   120→   120→      fetchSlots(selectedDuration);
+   121→   121→    }
+   122→   122→  }, [step, selectedDuration, slotsFetchedFor, fetchSlots]);
+   123→   123→
+   124→   124→  const handleNext = () => { if (step < 5) setStep(step + 1); };
+   125→   125→  const handleBack = () => { if (step > 0) setStep(step - 1); };
+   126→   126→
+   127→   127→  const canProceed = () => {
+   128→   128→    if (step === 1) return selectedDuration !== null;
+   129→   129→    if (step === 2) return selectedSlot !== null || skippedSlot;
+   130→   130→    if (step === 3) return selectedContexts.length > 0;
+   131→   131→    if (step === 4) return formData.name && formData.email;
+   132→   132→    return true;
+   133→   133→  };
+   134→   134→
+   135→   135→  const getPrice = () => {
+   136→   136→    if (selectedDuration === "30") return "₹1,499";
+   137→   137→    if (selectedDuration === "60") return "₹1,999";
+   138→   138→    if (selectedDuration === "90") return "₹2,999";
+   139→   139→    return "";
+   140→   140→  };
+   141→   141→
+   142→   142→  const handleSlotSelect = (slot: Slot) => {
+   143→   143→    setSelectedSlot(slot);
+   144→   144→    setSkippedSlot(false);
+   145→   145→  };
+   146→   146→
+   147→   147→  const handleSkipSlot = () => {
+   148→   148→    setSelectedSlot(null);
+   149→   149→    setSkippedSlot(true);
+   150→   150→  };
+   151→   151→
+   152→   152→  // ─── Final submission ─────────────────────────────────────────
+   153→   153→  // If a slot is selected, POST to /api/slots/[id] (self-serve calendar booking).
+   154→   154→  // If skipped (fallback), behave like the original WhatsApp flow + POST /api/bookings.
+   155→   155→  const handleFinalSubmit = async () => {
+   156→   156→    setBookingError(null);
+   157→   157→    setSubmitting(true);
+   158→   158→
+   159→   159→    const payload = {
+   160→   160→      name: formData.name,
+   161→   161→      email: formData.email,
+   162→   162→      phone: formData.phone,
+   163→   163→      duration: selectedDuration,
+   164→   164→      price: getPrice(),
+   165→   165→      contexts: selectedContexts,
+   166→   166→      birthDate: formData.birthDate,
+   167→   167→      birthTime: formData.birthTime,
+   168→   168→      birthPlace: formData.birthPlace,
+   169→   169→      message: formData.message,
+   170→   170→      // Honeypot — must be empty for real users.
+   171→   171→      website: "",
+   172→   172→    };
+   173→   173→
+   174→   174→    if (selectedSlot) {
+   175→   175→      // Self-serve calendar booking path.
+   176→   176→      try {
+   177→   177→        const res = await fetch(`/api/slots/${selectedSlot.id}`, {
+   178→   178→          method: "POST",
+   179→   179→          headers: { "Content-Type": "application/json" },
+   180→   180→          body: JSON.stringify(payload),
+   181→   181→        });
+   182→   182→        const data = await res.json();
+   183→   183→        if (!res.ok) {
+   184→   184→          setBookingError(data.error || t("booking.bookingError"));
+   185→   185→          setSubmitting(false);
+   186→   186→          return;
+   187→   187→        }
+   188→   188→        // Fire a non-blocking analytics event.
+   189→   189→        fetch("/api/analytics", {
+   190→   190→          method: "POST",
+   191→   191→          headers: { "Content-Type": "application/json" },
+   192→   192→          body: JSON.stringify({
+   193→   193→            event: "booking_complete",
+   194→   194→            data: { duration: selectedDuration, price: getPrice(), slot: selectedSlot.id },
+   195→   195→            page: "/",
+   196→   196→          }),
+   197→   197→        }).catch(() => {});
+   198→   198→        setBookingSuccess(true);
+   199→   199→      } catch {
+   200→   200→        setBookingError(t("booking.bookingError"));
+   201→   201→      } finally {
+   202→   202→        setSubmitting(false);
+   203→   203→      }
+   204→   204→      return;
+   205→   205→    }
+   206→   206→
+   207→   207→    // Fallback WhatsApp path (legacy).
+   208→   208→    try {
+   209→   209→      await fetch("/api/bookings", {
+   210→   210→        method: "POST",
+   211→   211→        headers: { "Content-Type": "application/json" },
+   212→   212→        body: JSON.stringify(payload),
+   213→   213→      });
+   214→   214→    } catch {
+   215→   215→      /* non-fatal — log only */
+   216→   216→    }
+   217→   217→
+   218→   218→    fetch("/api/analytics", {
+   219→   219→      method: "POST",
+   220→   220→      headers: { "Content-Type": "application/json" },
+   221→   221→      body: JSON.stringify({ event: "booking_complete", data: { duration: selectedDuration, price: getPrice() }, page: "/" }),
+   222→   222→    }).catch(() => {});
+   223→   223→
+   224→   224→    let birthDetails = "";
+   225→   225→    if (formData.birthDate || formData.birthTime || formData.birthPlace) {
+   226→   226→      const parts: string[] = [];
+   227→   227→      if (formData.birthDate) parts.push(formData.birthDate);
+   228→   228→      if (formData.birthTime) parts.push(formData.birthTime);
+   229→   229→      if (formData.birthPlace) parts.push(formData.birthPlace);
+   230→   230→      birthDetails = parts.join(", ");
+   231→   231→    }
+   232→   232→
+   233→   233→    openWhatsApp({
+   234→   234→      type: "booking",
+   235→   235→      name: formData.name, email: formData.email, phone: formData.phone,
+   236→   236→      duration: selectedDuration || "", price: getPrice(),
+   237→   237→      contexts: selectedContexts,
+   238→   238→      birthDetails: birthDetails || undefined,
+   239→   239→      message: formData.message || undefined,
+   240→   240→    });
+   241→   241→
+   242→   242→    setBookingSuccess(true);
+   243→   243→    setSubmitting(false);
+   244→   244→  };
+   245→   245→
+   246→   246→  // ─── Group slots by date for the slot-picker step ─────────────
+   247→   247→  const groupedSlots = (() => {
+   248→   248→    const map = new Map<string, Slot[]>();
+   249→   249→    for (const s of slots) {
+   250→   250→      const key = dateGroupKey(s.start);
+   251→   251→      if (!map.has(key)) map.set(key, []);
+   252→   252→      map.get(key)!.push(s);
+   253→   253→    }
+   254→   254→    for (const arr of map.values()) {
+   255→   255→      arr.sort((a, b) => a.start.localeCompare(b.start));
+   256→   256→    }
+   257→   257→    return Array.from(map.entries()).sort(([a], [b]) => a.localeCompare(b));
+   258→   258→  })();
+   259→   259→
+   260→   260→  return (
+   261→   261→    <section id="booking" className="relative py-32 sm:py-48 px-6 sm:px-10 lg:px-16">
+   262→   262→      <div className="max-w-3xl mx-auto">
+   263→   263→        {/* Step 0: Emotional landing */}
+   264→   264→        {step === 0 && (
+   265→   265→          <div>
+   266→   266→            <p className="text-[10px] tracking-[0.5em] uppercase text-[#c9a96e]/60 mb-8 font-light">
+   267→   267→              {t("booking.label")}
+   268→   268→            </p>
+   269→   269→            <h2 className="text-[#f0eee9] text-[clamp(2rem,5vw,3.75rem)] leading-[1.05] tracking-[-0.02em] font-serif max-w-2xl mb-8">
+   270→   270→              {t("booking.headline1")}{" "}
+   271→   271→              <span className="text-[#c9a96e] italic font-light">{t("booking.headline2")}</span>
+   272→   272→            </h2>
+   273→   273→            <p className="text-[#9a9a9a] text-sm sm:text-base leading-[1.85] max-w-md mb-12 font-light">
+   274→   274→              {t("booking.subtitle")}
+   275→   275→            </p>
+   276→   276→            <button
+   277→   277→              onClick={() => setStep(1)}
+   278→   278→              className="inline-flex items-center gap-4 text-[11px] tracking-[0.3em] uppercase text-[#f0eee9] border-b border-[#c9a96e]/50 pb-3 hover:border-[#c9a96e] transition-colors duration-500 cursor-pointer"
+   279→   279→            >
+   280→   280→              {t("booking.beginIntake")}
+   281→   281→              <span className="text-[#c9a96e]">→</span>
+   282→   282→            </button>
+   283→   283→          </div>
+   284→   284→        )}
+   285→   285→
+   286→   286→        {/* Steps 1-5 */}
+   287→   287→        {step > 0 && step < 6 && (
+   288→   288→          <>
+   289→   289→            {/* Minimal progress indicator — 5 steps */}
+   290→   290→            <div className="mb-16">
+   291→   291→              <div className="flex items-center justify-between mb-3 text-[10px] tracking-[0.3em] uppercase font-mono font-light">
+   292→   292→                {STEPS.map((s, i) => (
+   293→   293→                  <div key={s.id} className={`flex items-center gap-3 ${i < STEPS.length - 1 ? "flex-1" : ""}`}>
+   294→   294→                    <span className={s.id <= step ? "text-[#c9a96e]" : "text-[#3a3a3a]"}>
+   295→   295→                      {String(s.id).padStart(2, "0")}
+   296→   296→                    </span>
+   297→   297→                    {i < STEPS.length - 1 && (
+   298→   298→                      <div className={`flex-1 h-px ${s.id < step ? "bg-[#c9a96e]/40" : "bg-white/[0.06]"}`} />
+   299→   299→                    )}
+   300→   300→                  </div>
+   301→   301→                ))}
+   302→   302→              </div>
+   303→   303→              <div className="flex justify-between text-[9px] tracking-[0.25em] uppercase text-[#5a5a5a] font-light">
+   304→   304→                {STEPS.map((s) => (
+   305→   305→                  <span key={s.id} className="text-center flex-1 first:text-left last:text-right">
+   306→   306→                    {t(s.labelKey)}
+   307→   307→                  </span>
+   308→   308→                ))}
+   309→   309→              </div>
+   310→   310→            </div>
+   311→   311→
+   312→   312→            <AnimatePresence mode="wait">
+   313→   313→              <motion.div
+   314→   314→                key={step}
+   315→   315→                initial={{ opacity: 0, x: 20 }}
+   316→   316→                animate={{ opacity: 1, x: 0 }}
+   317→   317→                exit={{ opacity: 0, x: -20 }}
+   318→   318→                transition={{ duration: 0.4 }}
+   319→   319→              >
+   320→   320→                {/* Step 1 — Duration */}
+   321→   321→                {step === 1 && (
+   322→   322→                  <div>
+   323→   323→                    <p className="text-[#9a9a9a] text-sm leading-[1.8] mb-10 font-light">
+   324→   324→                      {t("booking.howDeep")}
+   325→   325→                    </p>
+   326→   326→                    <div className="border-t border-white/[0.06]">
+   327→   327→                      {durationKeys.map((d) => (
+   328→   328→                        <button
+   329→   329→                          key={d.value}
+   330→   330→                          onClick={() => {
+   331→   331→                            setSelectedDuration(d.value);
+   332→   332→                            // Reset slot state when duration changes.
+   333→   333→                            setSelectedSlot(null);
+   334→   334→                            setSkippedSlot(false);
+   335→   335→                          }}
+   336→   336→                          className={`w-full text-left py-6 border-b border-white/[0.06] transition-colors duration-400 cursor-pointer grid grid-cols-12 gap-4 items-baseline px-2 ${
+   337→   337→                            selectedDuration === d.value ? "bg-white/[0.02]" : "hover:bg-white/[0.015]"
+   338→   338→                          }`}
+   339→   339→                        >
+   340→   340→                          <div className="col-span-12 sm:col-span-7">
+   341→   341→                            <p className={`text-base sm:text-lg font-serif font-light ${selectedDuration === d.value ? "text-[#c9a96e]" : "text-[#f0eee9]"}`}>
+   342→   342→                              {t(d.labelKey)}
+   343→   343→                              {d.recommended && (
+   344→   344→                                <span className="ml-3 text-[9px] tracking-[0.3em] uppercase text-[#c9a96e]/70 border border-[#c9a96e]/30 px-2 py-0.5 font-light">
+   345→   345→                                  {t("booking.recommended")}
+   346→   346→                                </span>
+   347→   347→                              )}
+   348→   348→                            </p>
+   349→   349→                            <p className="text-[12px] text-[#7a7a7a] mt-2 font-light">{t(d.sublabelKey)}</p>
+   350→   350→                          </div>
+   351→   351→                          <div className="col-span-12 sm:col-span-5 sm:text-right">
+   352→   352→                            <p className="text-[#c9a96e] text-lg font-serif font-light">{d.price}</p>
+   353→   353→                          </div>
+   354→   354→                        </button>
+   355→   355→                      ))}
+   356→   356→                    </div>
+   357→   357→                  </div>
+   358→   358→                )}
+   359→   359→
+   360→   360→                {/* Step 2 — Slot picker (NEW) */}
+   361→   361→                {step === 2 && (
+   362→   362→                  <div>
+   363→   363→                    <p className="text-[#f0eee9] text-xl sm:text-2xl font-serif font-light mb-3 leading-tight">
+   364→   364→                      {t("booking.slotTitle")}
+   365→   365→                    </p>
+   366→   366→                    <p className="text-[#9a9a9a] text-sm leading-[1.8] mb-10 font-light">
+   367→   367→                      {t("booking.slotSubtitle")}
+   368→   368→                    </p>
+   369→   369→
+   370→   370→                    {/* Loading state */}
+   371→   371→                    {slotsLoading && (
+   372→   372→                      <div className="border-t border-white/[0.06] py-10 text-center">
+   373→   373→                        <p className="text-[#7a7a7a] text-sm font-light animate-pulse">
+   374→   374→                          {t("booking.slotLoading")}
+   375→   375→                        </p>
+   376→   376→                      </div>
+   377→   377→                    )}
+   378→   378→
+   379→   379→                    {/* Error state */}
+   380→   380→                    {!slotsLoading && slotsError && (
+   381→   381→                      <div className="border-t border-white/[0.06] py-10 text-center">
+   382→   382→                        <p className="text-[#7a7a7a] text-sm font-light mb-4">
+   383→   383→                          {slotsError}
+   384→   384→                        </p>
+   385→   385→                        <button
+   386→   386→                          onClick={() => selectedDuration && fetchSlots(selectedDuration)}
+   387→   387→                          className="inline-flex items-center gap-2 text-[11px] tracking-[0.3em] uppercase text-[#c9a96e] border-b border-[#c9a96e]/40 pb-2 hover:border-[#c9a96e] transition-colors cursor-pointer"
+   388→   388→                        >
+   389→   389→                          {t("booking.slotRetryBtn")} →
+   390→   390→                        </button>
+   391→   391→                      </div>
+   392→   392→                    )}
+   393→   393→
+   394→   394→                    {/* Empty state */}
+   395→   395→                    {!slotsLoading && !slotsError && slots.length === 0 && (
+   396→   396→                      <div className="border-t border-white/[0.06] py-10">
+   397→   397→                        <p className="text-[#9a9a9a] text-sm font-light mb-2 text-center">
+   398→   398→                          {t("booking.slotEmpty")}
+   399→   399→                        </p>
+   400→   400→                        <p className="text-[#7a7a7a] text-xs font-light mb-6 text-center max-w-md mx-auto">
+   401→   401→                          {t("booking.slotEmptyHint")}
+   402→   402→                        </p>
+   403→   403→                        <div className="text-center">
+   404→   404→                          <button
+   405→   405→                            onClick={handleSkipSlot}
+   406→   406→                            className="inline-flex items-center gap-2 text-[11px] tracking-[0.3em] uppercase text-[#c9a96e] border-b border-[#c9a96e]/40 pb-2 hover:border-[#c9a96e] transition-colors cursor-pointer"
+   407→   407→                          >
+   408→   408→                            {t("booking.slotEmptyCta")} →
+   409→   409→                          </button>
+   410→   410→                        </div>
+   411→   411→                      </div>
+   412→   412→                    )}
+   413→   413→
+   414→   414→                    {/* Slots list — grouped by date */}
+   415→   415→                    {!slotsLoading && !slotsError && slots.length > 0 && (
+   416→   416→                      <div className="space-y-8 max-h-[28rem] overflow-y-auto pr-2 -mr-2
+   417→   417→                        [scrollbar-width:thin] [scrollbar-color:#c9a96e40_transparent]
+   418→   418→                        [&::-webkit-scrollbar]:w-[3px]
+   419→   419→                        [&::-webkit-scrollbar-track]:bg-transparent
+   420→   420→                        [&::-webkit-scrollbar-thumb]:bg-[#c9a96e]/30
+   421→   421→                        [&::-webkit-scrollbar-thumb:hover]:bg-[#c9a96e]/60">
+   422→   422→                        {groupedSlots.map(([dateKey, daySlots]) => (
+   423→   423→                          <div key={dateKey}>
+   424→   424→                            {/* Day header — Cinzel uppercase, thin gold divider */}
+   425→   425→                            <div className="flex items-center gap-3 mb-3">
+   426→   426→                              <p className="text-[10px] tracking-[0.3em] uppercase text-[#c9a96e]/80 font-light"
+   427→   427→                                 style={{ fontFamily: "Cinzel, serif" }}>
+   428→   428→                                {formatDateLong(daySlots[0].start)}
+   429→   429→                              </p>
+   430→   430→                              <div className="flex-1 h-px bg-[#c9a96e]/15" />
+   431→   431→                            </div>
+   432→   432→                            {/* Time slots — borderless cards with bottom underline on hover */}
+   433→   433→                            <div className="grid grid-cols-2 sm:grid-cols-3 gap-px">
+   434→   434→                              {daySlots.map((slot) => {
+   435→   435→                                const isSelected = selectedSlot?.id === slot.id;
+   436→   436→                                return (
+   437→   437→                                  <button
+   438→   438→                                    key={slot.id}
+   439→   439→                                    onClick={() => handleSlotSelect(slot)}
+   440→   440→                                    className={`text-left px-3 py-3 transition-all duration-300 cursor-pointer border-b ${
+   441→   441→                                      isSelected
+   442→   442→                                        ? "border-[#c9a96e] bg-[#c9a96e]/[0.06]"
+   443→   443→                                        : "border-white/[0.04] hover:border-[#c9a96e]/40 hover:bg-white/[0.015]"
+   444→   444→                                    }`}
+   445→   445→                                  >
+   446→   446→                                    <p className={`font-mono text-sm ${isSelected ? "text-[#c9a96e]" : "text-[#f0eee9]"} font-light`}>
+   447→   447→                                      {formatSlotTime(slot.start)}
+   448→   448→                                    </p>
+   449→   449→                                    <p className="text-[10px] text-[#5a5a5a] mt-0.5 font-light">
+   450→   450→                                      {slot.duration} min
+   451→   451→                                    </p>
+   452→   452→                                  </button>
+   453→   453→                                );
+   454→   454→                              })}
+   455→   455→                            </div>
+   456→   456→                          </div>
+   457→   457→                        ))}
+   458→   458→                      </div>
+   459→   459→                    )}
+   460→   460→
+   461→   461→                    {/* Selected slot chip + skip link */}
+   462→   462→                    {!slotsLoading && !slotsError && slots.length > 0 && (
+   463→   463→                      <div className="mt-8 pt-6 border-t border-white/[0.06] flex flex-wrap items-center justify-between gap-4">
+   464→   464→                        {selectedSlot ? (
+   465→   465→                          <p className="text-[11px] tracking-[0.2em] uppercase text-[#c9a96e] font-light">
+   466→   466→                            {t("booking.slotSelected")}:{" "}
+   467→   467→                            <span className="font-mono normal-case tracking-normal">
+   468→   468→                              {formatDateShort(selectedSlot.start)} · {formatSlotTime(selectedSlot.start)}
+   469→   469→                            </span>
+   470→   470→                          </p>
+   471→   471→                        ) : (
+   472→   472→                          <span className="text-[11px] text-[#5a5a5a] font-light">
+   473→   473→                            {t("booking.confirmSlotNone")}
+   474→   474→                          </span>
+   475→   475→                        )}
+   476→   476→                        <button
+   477→   477→                          onClick={handleSkipSlot}
+   478→   478→                          className="text-[10px] tracking-[0.3em] uppercase text-[#7a7a7a] hover:text-[#f0eee9] transition-colors cursor-pointer"
+   479→   479→                        >
+   480→   480→                          {t("booking.slotFallbackCta")} →
+   481→   481→                        </button>
+   482→   482→                      </div>
+   483→   483→                    )}
+   484→   484→                  </div>
+   485→   485→                )}
+   486→   486→
+   487→   487→                {/* Step 3 — Context (what resonates) */}
+   488→   488→                {step === 3 && (
+   489→   489→                  <div>
+   490→   490→                    <p className="text-[#9a9a9a] text-sm leading-[1.8] mb-10 font-light">
+   491→   491→                      {t("booking.whatResonates")}
+   492→   492→                    </p>
+   493→   493→                    <div className="border-t border-white/[0.06]">
+   494→   494→                      {contextKeys.map((ctxKey, i) => (
+   495→   495→                        <button
+   496→   496→                          key={ctxKey}
+   497→   497→                          onClick={() => toggleContext(ctxKey)}
+   498→   498→                          className={`w-full text-left py-4 border-b border-white/[0.06] transition-colors duration-400 cursor-pointer flex items-baseline gap-4 px-2 ${
+   499→   499→                            selectedContexts.includes(ctxKey) ? "bg-white/[0.02]" : "hover:bg-white/[0.015]"
+   500→   500→                          }`}
+   501→   501→                        >
+   502→   502→                          <span className={`text-[10px] tracking-[0.2em] font-mono ${
+   503→   503→                            selectedContexts.includes(ctxKey) ? "text-[#c9a96e]" : "text-[#3a3a3a]"
+   504→   504→                          }`}>
+   505→   505→                            {String(i + 1).padStart(2, "0")}
+   506→   506→                          </span>
+   507→   507→                          <span className={`text-sm font-light flex-1 ${
+   508→   508→                            selectedContexts.includes(ctxKey) ? "text-[#c9a96e]" : "text-[#9a9a9a]"
+   509→   509→                          }`}>
+   510→   510→                            {t(ctxKey)}
+   511→   511→                          </span>
+   512→   512→                        </button>
+   513→   513→                      ))}
+   514→   514→                    </div>
+   515→   515→                  </div>
+   516→   516→                )}
+   517→   517→
+   518→   518→                {/* Step 4 — Your details */}
+   519→   519→                {step === 4 && (
+   520→   520→                  <div className="space-y-6">
+   521→   521→                    <p className="text-[#9a9a9a] text-sm leading-[1.8] font-light">
+   522→   522→                      {t("booking.prepareChart")}
+   523→   523→                    </p>
+   524→   524→                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+   525→   525→                      {[
+   526→   526→                        { labelKey: "booking.field.fullName", key: "name" as const, type: "text", placeholderKey: "booking.placeholder.name" },
+   527→   527→                        { labelKey: "booking.field.email", key: "email" as const, type: "email", placeholderKey: "booking.placeholder.email" },
+   528→   528→                        { labelKey: "booking.field.phone", key: "phone" as const, type: "tel", placeholderKey: "booking.placeholder.phone" },
+   529→   529→                        { labelKey: "booking.field.birthDate", key: "birthDate" as const, type: "date", placeholderKey: "" },
+   530→   530→                        { labelKey: "booking.field.birthTime", key: "birthTime" as const, type: "time", placeholderKey: "" },
+   531→   531→                        { labelKey: "booking.field.birthPlace", key: "birthPlace" as const, type: "text", placeholderKey: "booking.placeholder.birthPlace" },
+   532→   532→                      ].map((field) => (
+   533→   533→                        <div key={field.key}>
+   534→   534→                          <label className="text-[10px] tracking-[0.3em] uppercase text-[#7a7a7a] mb-2 block font-light">
+   535→   535→                            {t(field.labelKey)}
+   536→   536→                          </label>
+   537→   537→                          <input
+   538→   538→                            type={field.type}
+   539→   539→                            value={formData[field.key]}
+   540→   540→                            onChange={(e) => setFormData({ ...formData, [field.key]: e.target.value })}
+   541→   541→                            className="w-full bg-transparent border-b border-white/[0.1] px-1 py-2 text-sm text-[#f0eee9] focus:border-[#c9a96e]/60 focus:outline-none transition-colors placeholder:text-[#3a3a3a] font-light"
+   542→   542→                            placeholder={field.placeholderKey ? t(field.placeholderKey) : undefined}
+   543→   543→                          />
+   544→   544→                        </div>
+   545→   545→                      ))}
+   546→   546→                    </div>
+   547→   547→                    <div className="mt-6">
+   548→   548→                      <label className="text-[10px] tracking-[0.3em] uppercase text-[#7a7a7a] mb-2 block font-light">
+   549→   549→                        {t("booking.field.anythingElse")}
+   550→   550→                      </label>
+   551→   551→                      <textarea
+   552→   552→                        value={formData.message}
+   553→   553→                        onChange={(e) => setFormData({ ...formData, message: e.target.value })}
+   554→   554→                        rows={3}
+   555→   555→                        className="w-full bg-transparent border-b border-white/[0.1] px-1 py-2 text-sm text-[#f0eee9] focus:border-[#c9a96e]/60 focus:outline-none transition-colors resize-none placeholder:text-[#3a3a3a] font-light"
+   556→   556→                        placeholder={t("booking.placeholder.message")}
+   557→   557→                      />
+   558→   558→                    </div>
+   559→   559→                  </div>
+   560→   560→                )}
+   561→   561→
+   562→   562→                {/* Step 5 — Confirm + submit */}
+   563→   563→                {step === 5 && (
+   564→   564→                  <div className="py-4">
+   565→   565→                    {/* Success state (after submission) */}
+   566→   566→                    {bookingSuccess ? (
+   567→   567→                      <div className="text-center py-8">
+   568→   568→                        <motion.div
+   569→   569→                          initial={{ scale: 0.92, opacity: 0 }}
+   570→   570→                          animate={{ scale: 1, opacity: 1 }}
+   571→   571→                          transition={{ duration: 0.5, ease: "easeOut" }}
+   572→   572→                        >
+   573→   573→                          <p className="text-[10px] tracking-[0.5em] uppercase text-[#c9a96e]/60 mb-6 font-light">
+   574→   574→                            {t("booking.label")}
+   575→   575→                          </p>
+   576→   576→                          <h3 className="text-[#f0eee9] text-2xl sm:text-3xl font-serif font-light mb-4 leading-tight">
+   577→   577→                            {selectedSlot
+   578→   578→                              ? t("booking.bookingSuccessTitle")
+   579→   579→                              : t("booking.sessionReady")}
+   580→   580→                          </h3>
+   581→   581→                          <p className="text-[#9a9a9a] text-sm leading-[1.8] max-w-md mx-auto mb-8 font-light">
+   582→   582→                            {selectedSlot
+   583→   583→                              ? `${t("booking.bookingSuccessBody")}`
+   584→   584→                              : t("booking.completeViaWhatsApp")}
+   585→   585→                          </p>
+   586→   586→                          {selectedSlot && (
+   587→   587→                            <div className="inline-block border border-[#c9a96e]/20 bg-[#c9a96e]/[0.04] px-6 py-4 mb-6">
+   588→   588→                              <p className="text-[9px] tracking-[0.3em] uppercase text-[#7a7a7a] mb-1 font-light">
+   589→   589→                                {t("booking.confirmSlot")}
+   590→   590→                              </p>
+   591→   591→                              <p className="text-[#f0eee9] text-base font-serif font-light">
+   592→   592→                                {formatDateLong(selectedSlot.start)}
+   593→   593→                              </p>
+   594→   594→                              <p className="text-[#c9a96e] font-mono text-sm mt-1">
+   595→   595→                                {formatSlotTime(selectedSlot.start)} — {formatSlotTime(selectedSlot.end)} (IST)
+   596→   596→                              </p>
+   597→   597→                            </div>
+   598→   598→                          )}
+   599→   599→                          <div>
+   600→   600→                            <button
+   601→   601→                              onClick={() => {
+   602→   602→                                // Reset entire flow back to landing.
+   603→   603→                                setStep(0);
+   604→   604→                                setSelectedDuration(null);
+   605→   605→                                setSelectedSlot(null);
+   606→   606→                                setSkippedSlot(false);
+   607→   607→                                setSelectedContexts([]);
+   608→   608→                                setFormData({
+   609→   609→                                  name: "", email: "", phone: "",
+   610→   610→                                  birthDate: "", birthTime: "", birthPlace: "", message: "",
+   611→   611→                                });
+   612→   612→                                setBookingSuccess(false);
+   613→   613→                                setBookingError(null);
+   614→   614→                                setSlots([]);
+   615→   615→                                setSlotsFetchedFor(null);
+   616→   616→                              }}
+   617→   617→                              className="text-[11px] tracking-[0.3em] uppercase text-[#7a7a7a] hover:text-[#f0eee9] transition-colors cursor-pointer"
+   618→   618→                            >
+   619→   619→                              {t("booking.back")}
+   620→   620→                            </button>
+   621→   621→                          </div>
+   622→   622→                        </motion.div>
+   623→   623→                      </div>
+   624→   624→                    ) : (
+   625→   625→                      <>
+   626→   626→                        <h3 className="text-[#f0eee9] text-xl sm:text-2xl font-serif font-light mb-4 leading-tight">
+   627→   627→                          {t("booking.sessionReady")}
+   628→   628→                        </h3>
+   629→   629→                        <p className="text-[#9a9a9a] text-sm leading-[1.8] max-w-md mb-10 font-light">
+   630→   630→                          {selectedSlot
+   631→   631→                            ? t("booking.bookingSuccessBody")
+   632→   632→                            : t("booking.completeViaWhatsApp")}
+   633→   633→                        </p>
+   634→   634→                        <div className="border-t border-white/[0.06] pt-6 max-w-md">
+   635→   635→                          <p className="text-[9px] tracking-[0.3em] uppercase text-[#7a7a7a] mb-4 font-light">
+   636→   636→                            {t("booking.summary")}
+   637→   637→                          </p>
+   638→   638→                          <div className="space-y-3 text-sm">
+   639→   639→                            <div className="flex justify-between">
+   640→   640→                              <span className="text-[#7a7a7a] font-light">{t("booking.summaryDuration")}</span>
+   641→   641→                              <span className="text-[#f0eee9] font-light">{selectedDuration} min</span>
+   642→   642→                            </div>
+   643→   643→                            {selectedSlot && (
+   644→   644→                              <div className="flex justify-between gap-4">
+   645→   645→                                <span className="text-[#7a7a7a] font-light shrink-0">{t("booking.confirmSlot")}</span>
+   646→   646→                                <span className="text-[#f0eee9] font-light text-right font-mono">
+   647→   647→                                  {formatDateShort(selectedSlot.start)} · {formatSlotTime(selectedSlot.start)}
+   648→   648→                                </span>
+   649→   649→                              </div>
+   650→   650→                            )}
+   651→   651→                            <div className="flex justify-between">
+   652→   652→                              <span className="text-[#7a7a7a] font-light">{t("booking.summaryFocus")}</span>
+   653→   653→                              <span className="text-[#f0eee9] font-light">{selectedContexts.length} {t("booking.summarySelected")}</span>
+   654→   654→                            </div>
+   655→   655→                            <div className="border-t border-white/[0.06] pt-3 mt-3 flex justify-between">
+   656→   656→                              <span className="text-[#c9a96e] font-light">{t("booking.investment")}</span>
+   657→   657→                              <span className="text-[#c9a96e] font-serif">{getPrice()}</span>
+   658→   658→                            </div>
+   659→   659→                          </div>
+   660→   660→                        </div>
+   661→   661→
+   662→   662→                        {bookingError && (
+   663→   663→                          <p className="mt-6 text-red-400/80 text-sm font-light border-l-2 border-red-400/40 pl-3">
+   664→   664→                            {bookingError}
+   665→   665→                          </p>
+   666→   666→                        )}
+   667→   667→
+   668→   668→                        {/* Primary CTA — changes based on slot availability */}
+   669→   669→                        {selectedSlot ? (
+   670→   670→                          <button
+   671→   671→                            onClick={handleFinalSubmit}
+   672→   672→                            disabled={submitting}
+   673→   673→                            className="mt-10 inline-flex items-center gap-3 bg-[#c9a96e] hover:bg-[#d4b97e] text-[#050505] px-8 py-4 text-[11px] tracking-[0.3em] uppercase font-medium transition-all duration-500 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
+   674→   674→                          >
+   675→   675→                            {submitting ? t("booking.submitting") : t("booking.finalizeBooking")}
+   676→   676→                            {!submitting && <span>→</span>}
+   677→   677→                          </button>
+   678→   678→                        ) : (
+   679→   679→                          <button
+   680→   680→                            onClick={handleFinalSubmit}
+   681→   681→                            disabled={submitting}
+   682→   682→                            className="mt-10 inline-flex items-center gap-3 bg-[#25D366] hover:bg-[#20bd5a] text-[#050505] px-8 py-4 text-[11px] tracking-[0.3em] uppercase font-medium transition-all duration-500 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
+   683→   683→                          >
+   684→   684→                            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+   685→   685→                              <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
+   686→   686→                            </svg>
+   687→   687→                            {submitting ? t("booking.submitting") : t("booking.finalizeWhatsApp")}
+   688→   688→                          </button>
+   689→   689→                        )}
+   690→   690→                        <p className="text-[10px] text-[#5a5a5a] mt-4 tracking-wide font-light">
+   691→   691→                          {selectedSlot
+   692→   692→                            ? t("booking.bookingSuccessBody")
+   693→   693→                            : t("booking.prefilledNote")}
+   694→   694→                        </p>
+   695→   695→                      </>
+   696→   696→                    )}
+   697→   697→                  </div>
+   698→   698→                )}
+   699→   699→              </motion.div>
+   700→   700→            </AnimatePresence>
+   701→   701→
+   702→   702→            {/* Step navigation (hidden on final step + on success state) */}
+   703→   703→            {step > 0 && step < 5 && !bookingSuccess && (
+   704→   704→              <div className="flex items-center justify-between mt-12 pt-6 border-t border-white/[0.06]">
+   705→   705→                <button
+   706→   706→                  onClick={handleBack}
+   707→   707→                  className="text-[10px] tracking-[0.3em] uppercase text-[#7a7a7a] hover:text-[#f0eee9] transition-colors duration-500 cursor-pointer font-light"
+   708→   708→                >
+   709→   709→                  ← {t("booking.back")}
+   710→   710→                </button>
+   711→   711→                <button
+   712→   712→                  onClick={handleNext}
+   713→   713→                  disabled={!canProceed()}
+   714→   714→                  className="text-[10px] tracking-[0.3em] uppercase text-[#c9a96e] disabled:opacity-25 disabled:cursor-not-allowed cursor-pointer hover:text-[#f0eee9] transition-colors font-light"
+   715→   715→                >
+   716→   716→                  {t("booking.continueBtn")} →
+   717→   717→                </button>
+   718→   718→              </div>
+   719→   719→            )}
+   720→   720→          </>
+   721→   721→        )}
+   722→   722→      </div>
+   723→   723→    </section>
+   724→   724→  );
+   725→   725→}
+   726→   726→
