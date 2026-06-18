@@ -95,6 +95,26 @@ export const translations: Record<Locale, Record<string, string>> = {
     "microReading.back": "← Back",
     "microReading.continueBtn": "Continue →",
 
+    // ─── Micro Reading — Voice intake (M6-d) ───
+    "microReading.voice.speak": "Speak instead of type",
+    "microReading.voice.speakAria": "Speak your answer instead of typing",
+    "microReading.voice.recording": "Recording",
+    "microReading.voice.stopAria": "Stop recording",
+    "microReading.voice.transcribing": "Transcribing…",
+    "microReading.voice.useThis": "Use this",
+    "microReading.voice.tryAgain": "Try again",
+    "microReading.voice.cancel": "Cancel",
+    "microReading.voice.weHeard": "We heard",
+    "microReading.voice.confidencePrefix": "Confidence",
+    "microReading.voice.confidenceHigh": "· auto-selected",
+    "microReading.voice.confidenceLow": "· confirm below",
+    "microReading.voice.permissionDenied": "Microphone access needed. Please allow mic access in your browser.",
+    "microReading.voice.noMic": "No microphone found on this device.",
+    "microReading.voice.error": "Couldn't transcribe that. Try again or type instead.",
+    "microReading.voice.noSpeech": "No speech detected. Try again.",
+    "microReading.voice.heard": "We heard:",
+    "microReading.voice.heardAria": "We heard the following. Confirm or pick from the list.",
+
     // ─── Who Finds Me ───
     "whoFindsMe.label": "Recognition",
     "whoFindsMe.headline": "This is usually who finds me.",
@@ -487,6 +507,26 @@ export const translations: Record<Locale, Record<string, string>> = {
       "तुम्हारा पैटर्न एक से अधिक एटलस प्रविष्टियों से मेल खाता है। अपना पैटर्न खोजने के लिए पूरा एटलस देखें।",
     "microReading.back": "← पीछे",
     "microReading.continueBtn": "आगे →",
+
+    // ─── Micro Reading — Voice intake (M6-d) ───
+    "microReading.voice.speak": "बोलकर बताओ",
+    "microReading.voice.speakAria": "लिखने के बजाय अपना उत्तर बोलो",
+    "microReading.voice.recording": "रिकॉर्ड हो रहा है",
+    "microReading.voice.stopAria": "रिकॉर्डिंग रोको",
+    "microReading.voice.transcribing": "लिप्यंतरित हो रहा है…",
+    "microReading.voice.useThis": "यही इस्तेमाल करो",
+    "microReading.voice.tryAgain": "फिर से कोशिश करो",
+    "microReading.voice.cancel": "रद्द करो",
+    "microReading.voice.weHeard": "हमें सुनाई दिया",
+    "microReading.voice.confidencePrefix": "आत्मविश्वास",
+    "microReading.voice.confidenceHigh": "· स्वतः चुना गया",
+    "microReading.voice.confidenceLow": "· नीचे पुष्टि करो",
+    "microReading.voice.permissionDenied": "माइक की पहुँच चाहिए। ब्राउज़र में माइक की अनुमति दो।",
+    "microReading.voice.noMic": "इस डिवाइस पर माइक नहीं मिला।",
+    "microReading.voice.error": "लिप्यंतरण नहीं हो पाया। फिर कोशिश करो या लिख दो।",
+    "microReading.voice.noSpeech": "कोई आवाज़ नहीं सुनाई दी। फिर कोशिश करो।",
+    "microReading.voice.heard": "हमें सुनाई दिया:",
+    "microReading.voice.heardAria": "हमें नीचे सुनाई दिया। पुष्टि करो या सूची से चुनो।",
 
     // ─── Who Finds Me ───
     "whoFindsMe.label": "पहचान",

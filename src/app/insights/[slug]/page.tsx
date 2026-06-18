@@ -12,6 +12,7 @@ import { CLUSTER_BY_SLUG } from "@/lib/content/clusters";
 import { AUTHOR } from "@/lib/content/author";
 import { SERVICES, SERVICE_BY_SLUG } from "@/lib/content/services";
 import { renderMarkdown } from "@/lib/content/markdown";
+import AudioPlayer from "@/components/astrokalki/audio-player";
 
 /**
  * Article page — long-form cluster article with AI-search structure:
@@ -195,6 +196,14 @@ export default async function ArticlePage({ params }: PageProps) {
           </div>
         </div>
       </header>
+
+      {/* Audio narration player — auto-hides if no narration has been
+          generated for this slug yet. Probes /api/tts/[slug] on mount. */}
+      <section className="border-b border-white/[0.04]">
+        <div className="max-w-3xl mx-auto px-6 sm:px-10">
+          <AudioPlayer slug={slug} />
+        </div>
+      </section>
 
       {/* Concise answer — for AI search citation */}
       <section className="border-b border-white/[0.04] bg-white/[0.015]">

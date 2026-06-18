@@ -10,6 +10,7 @@ import {
   isHoneypotTriggered,
   honeypotSuccessResponse,
 } from '@/lib/security';
+import { dispatchPrepEmail } from '@/lib/session-emails';
 
 export async function POST(request: NextRequest) {
   // Rate limit — 3 bookings per IP per hour
@@ -166,6 +167,17 @@ export async function POST(request: NextRequest) {
             Status: ${booking.status}
           </p>
         `,
+      }),
+      // ─── Pre-session prep email ───────────────────────────────────
+      // Non-blocking + idempotent (SessionRecap row created on first
+      // dispatch; re-calls no-op). Failures are logged but never break
+      // booking creation. The cron at /api/cron/session-emails is the
+      // safety net for any bookings whose initial dispatch failed.
+      dispatchPrepEmail(booking.id).catch((err) => {
+        console.error(
+          `[bookings] prep email dispatch failed for ${booking.id}:`,
+          err
+        );
       }),
     ]);
 

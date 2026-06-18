@@ -1,0 +1,780 @@
+     1→     1→"use client";
+     2→     2→
+     3→     3→import { useMemo, useState } from "react";
+     4→     4→import Link from "next/link";
+     5→     5→import { AnimatePresence, motion } from "framer-motion";
+     6→     6→import { Check, RotateCcw, Share2, ArrowRight } from "lucide-react";
+     7→     7→import {
+     8→     8→  ATLAS_PATTERNS,
+     9→     9→  type AtlasPattern,
+    10→    10→} from "@/lib/content/patterns/atlas";
+    11→    11→import { getAtlasMeta } from "@/lib/content/patterns/micro-to-atlas";
+    12→    12→import { SERVICE_BY_SLUG } from "@/lib/content/services";
+    13→    13→
+    14→    14→/**
+    15→    15→ * PatternQuiz — the interactive "Find your pattern" quiz.
+    16→    16→ *
+    17→    17→ * Flow:
+    18→    18→ *   1. Seven questions, each with four options. Each option maps to one of
+    19→    19→ *      the ten Atlas patterns (options are designed so every pattern is
+    20→    20→ *      reachable from ≥2 questions).
+    21→    21→ *   2. After the last answer, the pattern with the most accumulated points
+    22→    22→ *      wins. Ties are broken by Atlas order (deterministic).
+    23→    23→ *   3. Result card reveals: pattern name (Playfair), tagline (italic
+    24→    24→ *      Playfair), "Why this pattern matches you" synthesis, "What you said"
+    25→    25→ *      list of the user's answers that pointed here, and CTAs to the full
+    26→    26→ *      pattern page + the related service. "Retake quiz" resets state.
+    27→    27→ *      "Share result" uses navigator.share when available, falling back to
+    28→    28→ *      clipboard copy with a transient confirmation.
+    29→    29→ *
+    30→    30→ * Design system: bg #050505, gold #c9a96e. Question text in Playfair, large.
+    31→    31→ * Answer options as borderless cards with a bottom underline, gold on
+    32→    32→ * selected/hover. Step indicator in mono. NO blue/indigo.
+    33→    33→ *
+    34→    34→ * Server-safe: this is a client component. The quiz logic (question pool,
+    35→    35→ * scoring, synthesis copy) lives in module scope so it can be unit-tested
+    36→    36→ * without rendering.
+    37→    37→ */
+    38→    38→
+    39→    39→const CINZEL = { fontFamily: "var(--font-cinzel)" } as const;
+    40→    40→
+    41→    41→// ─────────────────────────────────────────────────────────────────────────
+    42→    42→// Question pool
+    43→    43→// ─────────────────────────────────────────────────────────────────────────
+    44→    44→
+    45→    45→interface QuizOption {
+    46→    46→  /** Atlas slug this option scores for. */
+    47→    47→  pattern: string;
+    48→    48→  text: string;
+    49→    49→}
+    50→    50→
+    51→    51→interface QuizQuestion {
+    52→    52→  id: number;
+    53→    53→  /** Short label shown above the question, e.g. "Conflict". */
+    54→    54→  theme: string;
+    55→    55→  prompt: string;
+    56→    56→  options: QuizOption[];
+    57→    57→}
+    58→    58→
+    59→    59→const QUESTIONS: QuizQuestion[] = [
+    60→    60→  {
+    61→    61→    id: 1,
+    62→    62→    theme: "Conflict",
+    63→    63→    prompt: "When conflict arises in a close relationship, you tend to…",
+    64→    64→    options: [
+    65→    65→      {
+    66→    66→        pattern: "the-rescuer",
+    67→    67→        text: "Step in to fix it — even when the conflict isn't yours to fix.",
+    68→    68→      },
+    69→    69→      {
+    70→    70→        pattern: "the-avoider",
+    71→    71→        text: "Withdraw emotionally, sometimes physically. Wait for it to pass.",
+    72→    72→      },
+    73→    73→      {
+    74→    74→        pattern: "the-self-sabotage",
+    75→    75→        text: "Pick a fight you don't really want, then use it as the reason to leave.",
+    76→    76→      },
+    77→    77→      {
+    78→    78→        pattern: "the-chaser",
+    79→    79→        text: "Pursue the other person harder — call, text, push for resolution — even when they pull away.",
+    80→    80→      },
+    81→    81→    ],
+    82→    82→  },
+    83→    83→  {
+    84→    84→    id: 2,
+    85→    85→    theme: "Inner weather",
+    86→    86→    prompt: "Your recurring emotional state, the one underneath the surface, is…",
+    87→    87→    options: [
+    88→    88→      {
+    89→    89→        pattern: "the-invisible-child",
+    90→    90→        text: "A low-grade flatness — like feeling nothing very strongly, ever.",
+    91→    91→      },
+    92→    92→      {
+    93→    93→        pattern: "the-abandonment",
+    94→    94→        text: "Anxiety — about being left, about losing people, about the next departure.",
+    95→    95→      },
+    96→    96→      {
+    97→    97→        pattern: "the-emotional-caretaker",
+    98→    98→        text: "Guilt — for not doing enough, not being enough, not holding everyone well enough.",
+    99→    99→      },
+   100→   100→      {
+   101→   101→        pattern: "the-performer",
+   102→   102→        text: "Tension — you can never fully exhale, never fully arrive, never stop producing.",
+   103→   103→      },
+   104→   104→    ],
+   105→   105→  },
+   106→   106→  {
+   107→   107→    id: 3,
+   108→   108→    theme: "Feedback",
+   109→   109→    prompt: "The feedback you hear most often, from people who know you well, is…",
+   110→   110→    options: [
+   111→   111→      {
+   112→   112→        pattern: "the-hyper-independent",
+   113→   113→        text: "\u201CYou're so strong. So independent. You always have it together.\u201D",
+   114→   114→      },
+   115→   115→      {
+   116→   116→        pattern: "the-rescuer",
+   117→   117→        text: "\u201CYou always seem to end up with someone who needs you.\u201D",
+   118→   118→      },
+   119→   119→      {
+   120→   120→        pattern: "the-invisible-child",
+   121→   121→        text: "\u201CYou're so quiet — I forget you're here sometimes.\u201D",
+   122→   122→      },
+   123→   123→      {
+   124→   124→        pattern: "the-avoider",
+   125→   125→        text: "\u201CI never quite know what you're really feeling.\u201D",
+   126→   126→      },
+   127→   127→    ],
+   128→   128→  },
+   129→   129→  {
+   130→   130→    id: 4,
+   131→   131→    theme: "Stress response",
+   132→   132→    prompt: "In stressful moments, your default response is to…",
+   133→   133→    options: [
+   134→   134→      {
+   135→   135→        pattern: "the-performer",
+   136→   136→        text: "Work harder. Produce more. Push through. Stopping feels like dying.",
+   137→   137→      },
+   138→   138→      {
+   139→   139→        pattern: "the-emotional-caretaker",
+   140→   140→        text: "Hold everyone else's feelings — and forget you have any of your own.",
+   141→   141→      },
+   142→   142→      {
+   143→   143→        pattern: "the-hyper-independent",
+   144→   144→        text: "Take care of it alone. Asking for help isn't a real option.",
+   145→   145→      },
+   146→   146→      {
+   147→   147→        pattern: "the-self-sabotage",
+   148→   148→        text: "Do something that makes it worse — pick a fight, quit, binge, disappear.",
+   149→   149→      },
+   150→   150→    ],
+   151→   151→  },
+   152→   152→  {
+   153→   153→    id: 5,
+   154→   154→    theme: "History",
+   155→   155→    prompt: "The pattern you recognise most clearly in your history is…",
+   156→   156→    options: [
+   157→   157→      {
+   158→   158→        pattern: "the-chaser",
+   159→   159→        text: "Falling for people who are leaving, and losing interest in people who stay.",
+   160→   160→      },
+   161→   161→      {
+   162→   162→        pattern: "the-abandonment",
+   163→   163→        text: "Leaving relationships preemptively — or clinging long past the point of dignity.",
+   164→   164→      },
+   165→   165→      {
+   166→   166→        pattern: "the-outsider",
+   167→   167→        text: "Feeling like you don't belong — even in your own family, your own friend group.",
+   168→   168→      },
+   169→   169→      {
+   170→   170→        pattern: "the-emotional-caretaker",
+   171→   171→        text: "Being the listener, the supporter, the one no one thinks to listen to.",
+   172→   172→      },
+   173→   173→    ],
+   174→   174→  },
+   175→   175→  {
+   176→   176→    id: 6,
+   177→   177→    theme: "Receiving",
+   178→   178→    prompt: "When something good finally happens to you, you…",
+   179→   179→    options: [
+   180→   180→      {
+   181→   181→        pattern: "the-self-sabotage",
+   182→   182→        text: "Feel restless, suspicious, or like you need to do something to ruin it.",
+   183→   183→      },
+   184→   184→      {
+   185→   185→        pattern: "the-performer",
+   186→   186→        text: "Can't enjoy it — you're already thinking about the next thing to produce.",
+   187→   187→      },
+   188→   188→      {
+   189→   189→        pattern: "the-invisible-child",
+   190→   190→        text: "Minimise it, deflect, or shrug it off. It doesn't quite land.",
+   191→   191→      },
+   192→   192→      {
+   193→   193→        pattern: "the-abandonment",
+   194→   194→        text: "Worry about when the other shoe will drop, who will leave, what it will cost.",
+   195→   195→      },
+   196→   196→    ],
+   197→   197→  },
+   198→   198→  {
+   199→   199→    id: 7,
+   200→   200→    theme: "The unsaid",
+   201→   201→    prompt: "In your closest relationships, the thing you cannot say is…",
+   202→   202→    options: [
+   203→   203→      {
+   204→   204→        pattern: "the-hyper-independent",
+   205→   205→        text: "\u201CI need you.\u201D",
+   206→   206→      },
+   207→   207→      {
+   208→   208→        pattern: "the-emotional-caretaker",
+   209→   209→        text: "\u201CI'm not okay.\u201D",
+   210→   210→      },
+   211→   211→      {
+   212→   212→        pattern: "the-outsider",
+   213→   213→        text: "\u201CI don't belong here.\u201D",
+   214→   214→      },
+   215→   215→      {
+   216→   216→        pattern: "the-invisible-child",
+   217→   217→        text: "\u201CI want to be seen.\u201D",
+   218→   218→      },
+   219→   219→    ],
+   220→   220→  },
+   221→   221→];
+   222→   222→
+   223→   223→// ─────────────────────────────────────────────────────────────────────────
+   224→   224→// Per-pattern synthesis — written in second person, 2-3 sentences.
+   225→   225→// Derived from the clinical material in atlas.ts (conciseAnswer + tagline).
+   226→   226→// ─────────────────────────────────────────────────────────────────────────
+   227→   227→
+   228→   228→const SYNTHESIS: Record<string, string> = {
+   229→   229→  "the-rescuer":
+   230→   230→    "Your answers cluster around a single, familiar reflex: the moment someone near you is in pain, your nervous system treats their pain as your problem to solve. This is not generosity — it is a survival strategy installed when love first became synonymous with being needed. The pattern runs until you can tolerate watching someone you love struggle without intervening, and finally ask the harder question: who am I when no one needs me?",
+   231→   231→  "the-abandonment":
+   232→   232→    "Your answers point to a nervous system that learned, early, that love is unreliable and that closeness ends in pain. The reflex runs in two directions — sometimes you leave first, sometimes you cling too long — but it is the same wound underneath. The pattern is not really about the partner in front of you; it is about an old loss being re-triggered, and the adult body reverting to the survival strategy it learned when the original abandonment happened.",
+   233→   233→  "the-performer":
+   234→   234→    "Your answers describe someone who learned, very early, that love was a transaction: I produce, therefore I am seen; I stop, therefore I disappear. The drive that looks like ambition from outside is actually an attachment strategy running underneath. The pattern continues until the moment you are forced to stop — by burnout, by illness, by the audience thinning — and finally meet the question you have been running from: who am I when nothing is being produced?",
+   235→   235→  "the-invisible-child":
+   236→   236→    "Your answers describe someone who learned, before they had words for it, that the safest way to exist was to take up as little space as possible. The disappearing has become so habitual that you no longer notice you are doing it; you simply experience yourself as quiet, as shy, as not really one for the spotlight. The pattern ends not when you become loud, but when you allow yourself to take up space without apology — to voice the need, the opinion, the longing you have been swallowing for years.",
+   237→   237→  "the-emotional-caretaker":
+   238→   238→    "Your answers describe someone who became the listener, the holder, the one everyone comes to — while their own emotional life went unattended. You can describe other people's inner states with great precision; you struggle to describe your own. The pattern runs until the backlog of unmet feeling finally catches up with you, and you allow someone to hold you instead of always being the one who holds.",
+   239→   239→  "the-self-sabotage":
+   240→   240→    "Your answers point to a pattern that does not feel like self-destruction from inside — it feels like clarity, caution, or self-respect in the moment. That is exactly what makes it so hard to see. The sabotage is the acting-out of a nervous-system conviction: that good things do not last, and that the only safe move is to control the moment of destruction yourself. The pattern ends when you can finally tolerate the anxiety of receiving what you actually want, without tearing it down.",
+   241→   241→  "the-chaser":
+   242→   242→    "Your answers describe someone who does not fall in love with people — they fall in love with the chase. The intensity you feel is real, but it is the intensity of pursuit, not of connection; the moment someone becomes truly available, the charge collapses. Underneath is a nervous system that learned love must be pursued and that being chosen, fully, is dangerous. The pattern runs until you can tolerate receiving love without needing to escape it.",
+   243→   243→  "the-avoider":
+   244→   244→    "Your answers describe someone who learned, early, that the safest response to intensity — conflict, need, intimacy — is to withdraw. The withdrawal is rarely dramatic; it is a quiet pulling-back, a wall going up, a decision made in the body before the mind catches up. The pattern is not a preference for solitude; it is a survival strategy that grew into a personality. It ends when you can stay in the room — physically, emotionally — when every cell wants to leave.",
+   245→   245→  "the-outsider":
+   246→   246→    "Your answers point to a pattern installed by being the new one, the different one, the one who never quite fit — often across childhoods, cultures, or family systems. Belonging, for you, has always been conditional and provisional, and the nervous system learned to expect rejection before it arrived. The pattern is not a temperament; it is a strategy that protected you when belonging was genuinely unavailable. It ends when you stop proving your outsider status and let yourself belong somewhere, imperfectly.",
+   247→   247→  "the-hyper-independent":
+   248→   248→    "Your answers describe someone who learned, usually through early betrayal or absence, that needing others is unsafe — that the only reliable person is yourself. The independence looks like strength from outside, and is praised for it, which makes the pattern harder to see. Underneath is a nervous system that read every early dependence as a setup for betrayal. The pattern ends when you can ask for help and survive the vulnerability of receiving it.",
+   249→   249→};
+   250→   250→
+   251→   251→// ─────────────────────────────────────────────────────────────────────────
+   252→   252→// Scoring
+   253→   253→// ─────────────────────────────────────────────────────────────────────────
+   254→   254→
+   255→   255→interface QuizResult {
+   256→   256→  /** Atlas slug of the winning pattern. */
+   257→   257→  slug: string;
+   258→   258→  /** The resolved AtlasPattern object (always present — winner is always a real slug). */
+   259→   259→  pattern: AtlasPattern;
+   260→   260→  /** Pattern slug → number of answers that pointed to it. */
+   261→   261→  scores: Record<string, number>;
+   262→   262→  /** The user's selected option per question — keyed by question id. */
+   263→   263→  answers: Record<number, number>;
+   264→   264→  /** Questions whose chosen option pointed to the winning pattern. */
+   265→   265→  matchingQuestions: { question: QuizQuestion; option: QuizOption }[];
+   266→   266→}
+   267→   267→
+   268→   268→function calculateResult(answers: Record<number, number>): QuizResult {
+   269→   269→  const scores: Record<string, number> = {};
+   270→   270→  const matchingByPattern: Record<
+   271→   271→    string,
+   272→   272→    { question: QuizQuestion; option: QuizOption }[]
+   273→   273→  > = {};
+   274→   274→
+   275→   275→  for (const q of QUESTIONS) {
+   276→   276→    const optIdx = answers[q.id];
+   277→   277→    if (optIdx === undefined) continue;
+   278→   278→    const opt = q.options[optIdx];
+   279→   279→    if (!opt) continue;
+   280→   280→    scores[opt.pattern] = (scores[opt.pattern] ?? 0) + 1;
+   281→   281→    if (!matchingByPattern[opt.pattern]) matchingByPattern[opt.pattern] = [];
+   282→   282→    matchingByPattern[opt.pattern].push({ question: q, option: opt });
+   283→   283→  }
+   284→   284→
+   285→   285→  // Sort by score desc, then by atlas order (deterministic tiebreak).
+   286→   286→  const atlasOrder = new Map(ATLAS_PATTERNS.map((p, i) => [p.slug, i]));
+   287→   287→  const sorted = Object.entries(scores).sort((a, b) => {
+   288→   288→    if (b[1] !== a[1]) return b[1] - a[1];
+   289→   289→    const ai = atlasOrder.get(a[0]) ?? 999;
+   290→   290→    const bi = atlasOrder.get(b[0]) ?? 999;
+   291→   291→    return ai - bi;
+   292→   292→  });
+   293→   293→
+   294→   294→  const winnerSlug = sorted[0]?.[0] ?? ATLAS_PATTERNS[0].slug;
+   295→   295→  const winnerPattern =
+   296→   296→    ATLAS_PATTERNS.find((p) => p.slug === winnerSlug) ?? ATLAS_PATTERNS[0];
+   297→   297→
+   298→   298→  return {
+   299→   299→    slug: winnerSlug,
+   300→   300→    pattern: winnerPattern,
+   301→   301→    scores,
+   302→   302→    answers,
+   303→   303→    matchingQuestions: matchingByPattern[winnerSlug] ?? [],
+   304→   304→  };
+   305→   305→}
+   306→   306→
+   307→   307→// ─────────────────────────────────────────────────────────────────────────
+   308→   308→// Component
+   309→   309→// ─────────────────────────────────────────────────────────────────────────
+   310→   310→
+   311→   311→type Phase = "questions" | "result";
+   312→   312→
+   313→   313→export default function PatternQuiz() {
+   314→   314→  const [phase, setPhase] = useState<Phase>("questions");
+   315→   315→  const [current, setCurrent] = useState(0); // index into QUESTIONS
+   316→   316→  const [answers, setAnswers] = useState<Record<number, number>>({});
+   317→   317→  const [shared, setShared] = useState(false);
+   318→   318→
+   319→   319→  const total = QUESTIONS.length;
+   320→   320→  const question = QUESTIONS[current];
+   321→   321→  const isLast = current === total - 1;
+   322→   322→
+   323→   323→  const result = useMemo(
+   324→   324→    () => (phase === "result" ? calculateResult(answers) : null),
+   325→   325→    [phase, answers]
+   326→   326→  );
+   327→   327→
+   328→   328→  const selectOption = (optionIdx: number) => {
+   329→   329→    const nextAnswers = { ...answers, [question.id]: optionIdx };
+   330→   330→    setAnswers(nextAnswers);
+   331→   331→
+   332→   332→    // Auto-advance after a short beat so the user sees their selection
+   333→   333→    // highlighted before the next question slides in.
+   334→   334→    window.setTimeout(() => {
+   335→   335→      if (isLast) {
+   336→   336→        setPhase("result");
+   337→   337→        window.scrollTo({ top: 0, behavior: "smooth" });
+   338→   338→      } else {
+   339→   339→        setCurrent((c) => Math.min(c + 1, total - 1));
+   340→   340→      }
+   341→   341→    }, 280);
+   342→   342→  };
+   343→   343→
+   344→   344→  const retake = () => {
+   345→   345→    setAnswers({});
+   346→   346→    setCurrent(0);
+   347→   347→    setPhase("questions");
+   348→   348→    setShared(false);
+   349→   349→    window.scrollTo({ top: 0, behavior: "smooth" });
+   350→   350→  };
+   351→   351→
+   352→   352→  const goBack = () => {
+   353→   353→    if (current === 0) return;
+   354→   354→    setCurrent((c) => Math.max(0, c - 1));
+   355→   355→  };
+   356→   356→
+   357→   357→  const shareResult = async () => {
+   358→   358→    if (!result) return;
+   359→   359→    const url = `${window.location.origin}/patterns/atlas/${result.slug}`;
+   360→   360→    const shareData = {
+   361→   361→      title: `${result.pattern.name} — AstroKalki Pattern Atlas`,
+   362→   362→      text: `${result.pattern.tagline}\n\nFind your pattern:`,
+   363→   363→      url,
+   364→   364→    };
+   365→   365→    try {
+   366→   366→      if (
+   367→   367→        typeof navigator !== "undefined" &&
+   368→   368→        typeof navigator.share === "function"
+   369→   369→      ) {
+   370→   370→        await navigator.share(shareData);
+   371→   371→        return;
+   372→   372→      }
+   373→   373→      if (typeof navigator !== "undefined" && navigator.clipboard) {
+   374→   374→        await navigator.clipboard.writeText(url);
+   375→   375→        setShared(true);
+   376→   376→        window.setTimeout(() => setShared(false), 2400);
+   377→   377→      }
+   378→   378→    } catch {
+   379→   379→      // User cancelled share, or clipboard failed. Silent.
+   380→   380→    }
+   381→   381→  };
+   382→   382→
+   383→   383→  // ── Result phase ──
+   384→   384→  if (phase === "result" && result) {
+   385→   385→    return (
+   386→   386→      <ResultCard
+   387→   387→        result={result}
+   388→   388→        onRetake={retake}
+   389→   389→        onShare={shareResult}
+   390→   390→        shared={shared}
+   391→   391→      />
+   392→   392→    );
+   393→   393→  }
+   394→   394→
+   395→   395→  // ── Questions phase ──
+   396→   396→  return (
+   397→   397→    <div className="max-w-3xl mx-auto px-6 sm:px-10 py-16 sm:py-24">
+   398→   398→      {/* Step indicator + progress */}
+   399→   399→      <div className="mb-12 sm:mb-16">
+   400→   400→        <div className="flex items-baseline justify-between mb-4">
+   401→   401→          <span
+   402→   402→            className="text-[11px] tracking-[0.3em] text-[#c9a96e]/60 font-mono"
+   403→   403→            aria-current="step"
+   404→   404→          >
+   405→   405→            {String(current + 1).padStart(2, "0")} / {String(total).padStart(2, "0")}
+   406→   406→          </span>
+   407→   407→          <span
+   408→   408→            className="text-[10px] tracking-[0.3em] uppercase text-[#5a5a5a]"
+   409→   409→            style={CINZEL}
+   410→   410→          >
+   411→   411→            {question.theme}
+   412→   412→          </span>
+   413→   413→        </div>
+   414→   414→        {/* Progress rule */}
+   415→   415→        <div className="relative h-px bg-white/[0.06]">
+   416→   416→          <motion.div
+   417→   417→            className="absolute inset-y-0 left-0 bg-[#c9a96e]/60"
+   418→   418→            initial={false}
+   419→   419→            animate={{ width: `${((current + 1) / total) * 100}%` }}
+   420→   420→            transition={{ duration: 0.5, ease: "easeOut" }}
+   421→   421→          />
+   422→   422→        </div>
+   423→   423→      </div>
+   424→   424→
+   425→   425→      <AnimatePresence mode="wait">
+   426→   426→        <motion.div
+   427→   427→          key={question.id}
+   428→   428→          initial={{ opacity: 0, x: 24 }}
+   429→   429→          animate={{ opacity: 1, x: 0 }}
+   430→   430→          exit={{ opacity: 0, x: -24 }}
+   431→   431→          transition={{ duration: 0.45, ease: "easeOut" }}
+   432→   432→        >
+   433→   433→          {/* Question */}
+   434→   434→          <h2 className="text-[#f0eee9] text-2xl sm:text-3xl md:text-4xl font-serif font-light tracking-[-0.015em] leading-[1.2] mb-12 sm:mb-16">
+   435→   435→            {question.prompt}
+   436→   436→          </h2>
+   437→   437→
+   438→   438→          {/* Options — borderless cards with bottom underline, gold on selected/hover */}
+   439→   439→          <div role="group" aria-label={question.prompt}>
+   440→   440→            {question.options.map((opt, idx) => {
+   441→   441→              const selected = answers[question.id] === idx;
+   442→   442→              return (
+   443→   443→                <button
+   444→   444→                  key={idx}
+   445→   445→                  type="button"
+   446→   446→                  onClick={() => selectOption(idx)}
+   447→   447→                  aria-pressed={selected}
+   448→   448→                  aria-label={`Option ${idx + 1}: ${opt.text}`}
+   449→   449→                  className={`group w-full text-left py-6 sm:py-7 border-b transition-colors duration-300 cursor-pointer focus:outline-none focus-visible:ring-1 focus-visible:ring-[#c9a96e]/60 focus-visible:ring-inset ${
+   450→   450→                    selected
+   451→   451→                      ? "border-[#c9a96e] bg-[#c9a96e]/[0.025]"
+   452→   452→                      : "border-white/[0.06] hover:border-[#c9a96e]/40 hover:bg-white/[0.01]"
+   453→   453→                  } -mx-4 px-4 sm:-mx-6 sm:px-6`}
+   454→   454→                >
+   455→   455→                  <div className="flex items-baseline gap-5">
+   456→   456→                    <span
+   457→   457→                      className={`text-[10px] tracking-[0.25em] font-mono shrink-0 pt-1 transition-colors ${
+   458→   458→                        selected ? "text-[#c9a96e]" : "text-[#3a3a3a] group-hover:text-[#7a7a7a]"
+   459→   459→                      }`}
+   460→   460→                    >
+   461→   461→                      {String(idx + 1).padStart(2, "0")}
+   462→   462→                    </span>
+   463→   463→                    <span
+   464→   464→                      className={`text-base sm:text-lg font-light leading-[1.55] transition-colors ${
+   465→   465→                        selected
+   466→   466→                          ? "text-[#c9a96e]"
+   467→   467→                          : "text-[#cfcabf] group-hover:text-[#f0eee9]"
+   468→   468→                      }`}
+   469→   469→                    >
+   470→   470→                      {opt.text}
+   471→   471→                    </span>
+   472→   472→                    {selected && (
+   473→   473→                      <Check
+   474→   474→                        className="h-4 w-4 text-[#c9a96e] shrink-0 ml-auto pt-1"
+   475→   475→                        aria-hidden
+   476→   476→                      />
+   477→   477→                    )}
+   478→   478→                  </div>
+   479→   479→                </button>
+   480→   480→              );
+   481→   481→            })}
+   482→   482→          </div>
+   483→   483→        </motion.div>
+   484→   484→      </AnimatePresence>
+   485→   485→
+   486→   486→      {/* Back / progress controls */}
+   487→   487→      <div className="flex items-center justify-between mt-12 pt-6 border-t border-white/[0.04]">
+   488→   488→        <button
+   489→   489→          type="button"
+   490→   490→          onClick={goBack}
+   491→   491→          disabled={current === 0}
+   492→   492→          className="text-[10px] tracking-[0.3em] uppercase text-[#7a7a7a] hover:text-[#f0eee9] disabled:opacity-25 disabled:cursor-not-allowed transition-colors cursor-pointer font-light"
+   493→   493→          style={CINZEL}
+   494→   494→        >
+   495→   495→          ← Previous
+   496→   496→        </button>
+   497→   497→        <p className="text-[10px] tracking-[0.25em] uppercase text-[#3a3a3a]">
+   498→   498→          {Object.keys(answers).length} of {total} answered
+   499→   499→        </p>
+   500→   500→      </div>
+   501→   501→    </div>
+   502→   502→  );
+   503→   503→}
+   504→   504→
+   505→   505→// ─────────────────────────────────────────────────────────────────────────
+   506→   506→// Result card
+   507→   507→// ─────────────────────────────────────────────────────────────────────────
+   508→   508→
+   509→   509→function ResultCard({
+   510→   510→  result,
+   511→   511→  onRetake,
+   512→   512→  onShare,
+   513→   513→  shared,
+   514→   514→}: {
+   515→   515→  result: QuizResult;
+   516→   516→  onRetake: () => void;
+   517→   517→  onShare: () => void;
+   518→   518→  shared: boolean;
+   519→   519→}) {
+   520→   520→  const { pattern, slug, scores, matchingQuestions } = result;
+   521→   521→  const meta = getAtlasMeta(slug);
+   522→   522→  const serviceSlug = pattern.relatedService;
+   523→   523→  const service = serviceSlug ? SERVICE_BY_SLUG[serviceSlug] : undefined;
+   524→   524→  const synthesis = SYNTHESIS[slug] ?? pattern.conciseAnswer;
+   525→   525→  const winnerScore = scores[slug] ?? 0;
+   526→   526→  const totalAnswered = Object.values(scores).reduce((a, b) => a + b, 0);
+   527→   527→
+   528→   528→  return (
+   529→   529→    <div className="max-w-3xl mx-auto px-6 sm:px-10 py-16 sm:py-24">
+   530→   530→      <AnimatePresence>
+   531→   531→        <motion.div
+   532→   532→          initial={{ opacity: 0, y: 16 }}
+   533→   533→          animate={{ opacity: 1, y: 0 }}
+   534→   534→          transition={{ duration: 0.7, ease: "easeOut" }}
+   535→   535→        >
+   536→   536→          {/* Eyebrow */}
+   537→   537→          <p
+   538→   538→            className="text-[10px] tracking-[0.4em] uppercase text-[#c9a96e]/70 mb-8 font-light"
+   539→   539→            style={CINZEL}
+   540→   540→          >
+   541→   541→            Your pattern
+   542→   542→          </p>
+   543→   543→
+   544→   544→          {/* Pattern name — Playfair, large */}
+   545→   545→          <h2 className="text-[#f0eee9] text-4xl sm:text-5xl md:text-6xl font-serif font-light tracking-[-0.025em] leading-[1.05] mb-6">
+   546→   546→            {pattern.name}
+   547→   547→          </h2>
+   548→   548→
+   549→   549→          {/* Tagline — italic Playfair */}
+   550→   550→          <p className="text-[#cfcabf] text-xl sm:text-2xl font-serif italic font-light leading-[1.4] mb-10 max-w-2xl">
+   551→   551→            {pattern.tagline}
+   552→   552→          </p>
+   553→   553→
+   554→   554→          {/* Cluster + intensity meta line */}
+   555→   555→          <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-[10px] tracking-[0.25em] uppercase text-[#5a5a5a] mb-12 pb-8 border-b border-white/[0.06]">
+   556→   556→            <span style={CINZEL} className="text-[#c9a96e]/80">
+   557→   557→              {meta.cluster}
+   558→   558→            </span>
+   559→   559→            <span className="text-[#3a3a3a]">·</span>
+   560→   560→            <IntensityDots intensity={meta.intensity} />
+   561→   561→            <span className="text-[#3a3a3a]">·</span>
+   562→   562→            <span className="font-mono text-[10px]">
+   563→   563→              {winnerScore} of {totalAnswered} answers
+   564→   564→            </span>
+   565→   565→            <span className="text-[#3a3a3a]">·</span>
+   566→   566→            <span className="font-mono text-[10px]">
+   567→   567→              {pattern.readTime} min read
+   568→   568→            </span>
+   569→   569→          </div>
+   570→   570→
+   571→   571→          {/* Why this pattern matches you */}
+   572→   572→          <motion.div
+   573→   573→            initial={{ opacity: 0, y: 12 }}
+   574→   574→            animate={{ opacity: 1, y: 0 }}
+   575→   575→            transition={{ delay: 0.25, duration: 0.7 }}
+   576→   576→            className="mb-12"
+   577→   577→          >
+   578→   578→            <p
+   579→   579→              className="text-[10px] tracking-[0.4em] uppercase text-[#c9a96e]/70 mb-4 font-light"
+   580→   580→              style={CINZEL}
+   581→   581→            >
+   582→   582→              Why this pattern matches you
+   583→   583→            </p>
+   584→   584→            <p className="text-[#cfcabf] text-base sm:text-lg leading-[1.8] font-light max-w-2xl">
+   585→   585→              {synthesis}
+   586→   586→            </p>
+   587→   587→          </motion.div>
+   588→   588→
+   589→   589→          {/* What you said — the answers that pointed here */}
+   590→   590→          {matchingQuestions.length > 0 && (
+   591→   591→            <motion.div
+   592→   592→              initial={{ opacity: 0, y: 12 }}
+   593→   593→              animate={{ opacity: 1, y: 0 }}
+   594→   594→              transition={{ delay: 0.4, duration: 0.7 }}
+   595→   595→              className="mb-12"
+   596→   596→            >
+   597→   597→              <p
+   598→   598→                className="text-[10px] tracking-[0.4em] uppercase text-[#c9a96e]/70 mb-4 font-light"
+   599→   599→                style={CINZEL}
+   600→   600→              >
+   601→   601→                What you said
+   602→   602→              </p>
+   603→   603→              <ul className="space-y-0">
+   604→   604→                {matchingQuestions.map(({ question, option }, idx) => (
+   605→   605→                  <li
+   606→   606→                    key={question.id}
+   607→   607→                    className={`grid grid-cols-12 gap-4 py-4 border-b border-white/[0.04] ${
+   608→   608→                      idx === matchingQuestions.length - 1 ? "border-b-0" : ""
+   609→   609→                    }`}
+   610→   610→                  >
+   611→   611→                    <span
+   612→   612→                      className="col-span-3 sm:col-span-2 text-[10px] tracking-[0.3em] uppercase text-[#5a5a5a] pt-1"
+   613→   613→                      style={CINZEL}
+   614→   614→                    >
+   615→   615→                      {question.theme}
+   616→   616→                    </span>
+   617→   617→                    <span className="col-span-9 sm:col-span-10 text-[#cfcabf] text-sm sm:text-[15px] font-light leading-[1.65] italic">
+   618→   618→                      &ldquo;{option.text}&rdquo;
+   619→   619→                    </span>
+   620→   620→                  </li>
+   621→   621→                ))}
+   622→   622→              </ul>
+   623→   623→            </motion.div>
+   624→   624→          )}
+   625→   625→
+   626→   626→          {/* CTAs — full pattern page + related service */}
+   627→   627→          <motion.div
+   628→   628→            initial={{ opacity: 0, y: 12 }}
+   629→   629→            animate={{ opacity: 1, y: 0 }}
+   630→   630→            transition={{ delay: 0.55, duration: 0.7 }}
+   631→   631→            className="grid grid-cols-1 sm:grid-cols-2 gap-6 mb-12"
+   632→   632→          >
+   633→   633→            <Link
+   634→   634→              href={`/patterns/atlas/${slug}`}
+   635→   635→              className="group block p-6 border border-white/[0.06] hover:border-[#c9a96e]/40 hover:bg-white/[0.01] transition-colors duration-300"
+   636→   636→            >
+   637→   637→              <p
+   638→   638→                className="text-[10px] tracking-[0.3em] uppercase text-[#c9a96e]/70 mb-3"
+   639→   639→                style={CINZEL}
+   640→   640→              >
+   641→   641→                Read the full pattern
+   642→   642→              </p>
+   643→   643→              <p className="text-[#f0eee9] text-lg font-serif font-light leading-tight mb-2 group-hover:text-[#c9a96e] transition-colors">
+   644→   644→                {pattern.name}
+   645→   645→              </p>
+   646→   646→              <p className="text-[#9a9a9a] text-[13px] font-light leading-[1.7] mb-4">
+   647→   647→                The full nine-field structure — symptoms, origin, relationship
+   648→   648→                and career impact, shadow side, and what it&apos;s mistaken for.
+   649→   649→              </p>
+   650→   650→              <span
+   651→   651→                className="inline-flex items-center gap-2 text-[11px] tracking-[0.25em] uppercase text-[#c9a96e]"
+   652→   652→                style={CINZEL}
+   653→   653→              >
+   654→   654→                Open pattern page
+   655→   655→                <ArrowRight className="h-3.5 w-3.5" aria-hidden />
+   656→   656→              </span>
+   657→   657→            </Link>
+   658→   658→
+   659→   659→            {service && (
+   660→   660→              <Link
+   661→   661→                href={`/services/${serviceSlug}`}
+   662→   662→                className="group block p-6 border border-white/[0.06] hover:border-[#c9a96e]/40 hover:bg-white/[0.01] transition-colors duration-300"
+   663→   663→              >
+   664→   664→                <p
+   665→   665→                  className="text-[10px] tracking-[0.3em] uppercase text-[#c9a96e]/70 mb-3"
+   666→   666→                  style={CINZEL}
+   667→   667→                >
+   668→   668→                  The related service
+   669→   669→                </p>
+   670→   670→                <p className="text-[#f0eee9] text-lg font-serif font-light leading-tight mb-2 group-hover:text-[#c9a96e] transition-colors">
+   671→   671→                  {service.title}
+   672→   672→                </p>
+   673→   673→                <p className="text-[#9a9a9a] text-[13px] font-light leading-[1.7] mb-4">
+   674→   674→                  A structured astrology session that works directly with this
+   675→   675→                  pattern&apos;s birth-chart signature.
+   676→   676→                </p>
+   677→   677→                <span
+   678→   678→                  className="inline-flex items-center gap-2 text-[11px] tracking-[0.25em] uppercase text-[#c9a96e]"
+   679→   679→                  style={CINZEL}
+   680→   680→                >
+   681→   681→                  Explore the service
+   682→   682→                  <ArrowRight className="h-3.5 w-3.5" aria-hidden />
+   683→   683→                </span>
+   684→   684→              </Link>
+   685→   685→            )}
+   686→   686→          </motion.div>
+   687→   687→
+   688→   688→          {/* Retake + Share */}
+   689→   689→          <motion.div
+   690→   690→            initial={{ opacity: 0 }}
+   691→   691→            animate={{ opacity: 1 }}
+   692→   692→            transition={{ delay: 0.7, duration: 0.7 }}
+   693→   693→            className="flex flex-wrap items-center gap-6 pt-8 border-t border-white/[0.04]"
+   694→   694→          >
+   695→   695→            <button
+   696→   696→              type="button"
+   697→   697→              onClick={onRetake}
+   698→   698→              className="inline-flex items-center gap-3 text-[11px] tracking-[0.3em] uppercase text-[#f0eee9] border-b border-[#c9a96e]/50 pb-2 hover:border-[#c9a96e] hover:text-[#c9a96e] transition-colors cursor-pointer"
+   699→   699→              style={CINZEL}
+   700→   700→            >
+   701→   701→              <RotateCcw className="h-3.5 w-3.5" aria-hidden />
+   702→   702→              Retake quiz
+   703→   703→            </button>
+   704→   704→            <button
+   705→   705→              type="button"
+   706→   706→              onClick={onShare}
+   707→   707→              className="inline-flex items-center gap-3 text-[11px] tracking-[0.3em] uppercase text-[#c9a96e] border-b border-[#c9a96e]/40 pb-2 hover:border-[#c9a96e] hover:text-[#f0eee9] transition-colors cursor-pointer"
+   708→   708→              style={CINZEL}
+   709→   709→            >
+   710→   710→              <Share2 className="h-3.5 w-3.5" aria-hidden />
+   711→   711→              {shared ? "Link copied" : "Share result"}
+   712→   712→            </button>
+   713→   713→          </motion.div>
+   714→   714→
+   715→   715→          {/* Cross-links — the other patterns, in case the user wants to browse */}
+   716→   716→          <motion.div
+   717→   717→            initial={{ opacity: 0 }}
+   718→   718→            animate={{ opacity: 1 }}
+   719→   719→            transition={{ delay: 0.9, duration: 0.7 }}
+   720→   720→            className="mt-20 pt-10 border-t border-white/[0.04]"
+   721→   721→          >
+   722→   722→            <p
+   723→   723→              className="text-[10px] tracking-[0.4em] uppercase text-[#c9a96e]/60 mb-6 font-light"
+   724→   724→              style={CINZEL}
+   725→   725→            >
+   726→   726→              The other nine
+   727→   727→            </p>
+   728→   728→            <p className="text-[#9a9a9a] text-sm leading-[1.8] font-light mb-6 max-w-xl">
+   729→   729→              Patterns often overlap. Browse the rest of the Atlas to see what
+   730→   730→              else might be running underneath.
+   731→   731→            </p>
+   732→   732→            <Link
+   733→   733→              href="/patterns/atlas"
+   734→   734→              className="inline-flex items-center gap-3 text-[11px] tracking-[0.3em] uppercase text-[#c9a96e] border-b border-[#c9a96e]/40 pb-2 hover:border-[#c9a96e] hover:text-[#f0eee9] transition-colors"
+   735→   735→              style={CINZEL}
+   736→   736→            >
+   737→   737→              Browse the full Atlas
+   738→   738→              <span aria-hidden>→</span>
+   739→   739→            </Link>
+   740→   740→          </motion.div>
+   741→   741→        </motion.div>
+   742→   742→      </AnimatePresence>
+   743→   743→    </div>
+   744→   744→  );
+   745→   745→}
+   746→   746→
+   747→   747→// ─────────────────────────────────────────────────────────────────────────
+   748→   748→// IntensityDots — duplicated from AtlasExplorer so this file has no client
+   749→   749→// imports from a sibling client component (avoids bundling the whole
+   750→   750→// explorer just for the dots).
+   751→   751→// ─────────────────────────────────────────────────────────────────────────
+   752→   752→
+   753→   753→function IntensityDots({
+   754→   754→  intensity,
+   755→   755→}: {
+   756→   756→  intensity: "Low" | "Medium" | "High" | "Unknown";
+   757→   757→}) {
+   758→   758→  const level =
+   759→   759→    intensity === "High" ? 3 : intensity === "Medium" ? 2 : intensity === "Low" ? 1 : 0;
+   760→   760→  return (
+   761→   761→    <span
+   762→   762→      className="inline-flex items-center gap-1.5"
+   763→   763→      aria-label={`Intensity: ${intensity}`}
+   764→   764→      title={`Intensity: ${intensity}`}
+   765→   765→    >
+   766→   766→      {[0, 1, 2].map((i) => (
+   767→   767→        <span
+   768→   768→          key={i}
+   769→   769→          className={`block h-1.5 w-1.5 rounded-full ${
+   770→   770→            i < level ? "bg-[#c9a96e]" : "bg-[#2a2a2a]"
+   771→   771→          }`}
+   772→   772→        />
+   773→   773→      ))}
+   774→   774→      <span className="ml-1 text-[10px] tracking-[0.2em] uppercase text-[#5a5a5a] font-mono">
+   775→   775→        {intensity}
+   776→   776→      </span>
+   777→   777→    </span>
+   778→   778→  );
+   779→   779→}
+   780→   780→

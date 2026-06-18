@@ -10,6 +10,7 @@ import {
   isHoneypotTriggered,
   honeypotSuccessResponse,
 } from '@/lib/security';
+import { dispatchPrepEmail } from '@/lib/session-emails';
 
 /**
  * /api/slots/[id]
@@ -275,6 +276,17 @@ export async function POST(
             Status: ${booking.status}
           </p>
         `,
+      }),
+      // ─── Pre-session prep email ───────────────────────────────────
+      // Non-blocking + idempotent. For slot-booked sessions the
+      // scheduledAt is already set (slot.start), so the prep email
+      // includes the exact date/time. Failures are logged but never
+      // break booking creation.
+      dispatchPrepEmail(booking.id).catch((err) => {
+        console.error(
+          `[slots] prep email dispatch failed for ${booking.id}:`,
+          err
+        );
       }),
     ]);
 

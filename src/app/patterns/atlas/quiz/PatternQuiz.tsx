@@ -10,6 +10,7 @@ import {
 } from "@/lib/content/patterns/atlas";
 import { getAtlasMeta } from "@/lib/content/patterns/micro-to-atlas";
 import { SERVICE_BY_SLUG } from "@/lib/content/services";
+import PatternPortrait from "@/components/astrokalki/pattern-portrait";
 
 /**
  * PatternQuiz — the interactive "Find your pattern" quiz.
@@ -525,6 +526,15 @@ function ResultCard({
   const winnerScore = scores[slug] ?? 0;
   const totalAnswered = Object.values(scores).reduce((a, b) => a + b, 0);
 
+  // Email capture for the PatternPortrait CTA. The quiz itself doesn't
+  // require an email — but portrait generation does (we persist the
+  // portrait keyed by email so it shows up in the member portal + the
+  // inline gallery on a return visit). The input is optional: only when
+  // the user types a valid email does the portrait UI render.
+  const [portraitEmail, setPortraitEmail] = useState("");
+  const emailValid =
+    portraitEmail.length > 4 && portraitEmail.includes("@") && portraitEmail.includes(".");
+
   return (
     <div className="max-w-3xl mx-auto px-6 sm:px-10 py-16 sm:py-24">
       <AnimatePresence>
@@ -710,6 +720,61 @@ function ResultCard({
               <Share2 className="h-3.5 w-3.5" aria-hidden />
               {shared ? "Link copied" : "Share result"}
             </button>
+          </motion.div>
+
+          {/* ─── Pattern portrait CTA ───────────────────────────────────────
+              An AI-generated visual of the user's pattern. The quiz doesn't
+              collect an email natively, so we capture one inline here — the
+              portrait is keyed by email (so it surfaces in /account + on
+              return visits). Once a valid email is entered, the
+              PatternPortrait component renders with the full generate /
+              download / share / regenerate flow. */}
+          <motion.div
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.8, duration: 0.7 }}
+            className="mt-20 pt-10 border-t border-white/[0.04]"
+          >
+            <p
+              className="text-[10px] tracking-[0.4em] uppercase text-[#c9a96e]/60 mb-3 font-light"
+              style={CINZEL}
+            >
+              A visual of your pattern
+            </p>
+            <p className="text-[#9a9a9a] text-sm leading-[1.8] font-light mb-6 max-w-xl">
+              Receive a one-of-a-kind AI-generated image — abstract, cinematic,
+              keyed to the emotional shape of <span className="text-[#cfcabf] italic">{pattern.name}</span>. No two are alike.
+            </p>
+
+            {/* Email gate — minimal input, same visual language as the
+                micro-reading email field. Once valid, the portrait UI mounts. */}
+            {!emailValid ? (
+              <div className="max-w-md">
+                <label
+                  htmlFor="quiz-portrait-email"
+                  className="sr-only"
+                >
+                  Your email — to generate and save your pattern portrait
+                </label>
+                <div className="flex gap-3 border-b border-white/[0.08] pb-3 focus-within:border-[#c9a96e]/60 transition-colors">
+                  <input
+                    id="quiz-portrait-email"
+                    type="email"
+                    value={portraitEmail}
+                    onChange={(e) => setPortraitEmail(e.target.value)}
+                    placeholder="your@email.com"
+                    autoComplete="email"
+                    aria-required="true"
+                    className="flex-1 bg-transparent text-sm text-[#f0eee9] focus:outline-none placeholder:text-[#3a3a3a] font-light"
+                  />
+                </div>
+                <p className="text-[10px] text-[#5a5a5a] mt-3 tracking-wide font-light">
+                  We use your email to save the portrait to your account. No spam — unsubscribe anytime.
+                </p>
+              </div>
+            ) : (
+              <PatternPortrait pattern={slug} email={portraitEmail} />
+            )}
           </motion.div>
 
           {/* Cross-links — the other patterns, in case the user wants to browse */}

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { AnimatePresence, motion } from "framer-motion";
 import { useI18n } from "@/lib/i18n-context";
 import { microReadingToAtlasPatternObject } from "@/lib/content/patterns/micro-to-atlas";
+import VoiceInput, { type VoiceResult } from "@/components/astrokalki/voice-input";
 
 const months = [
   "January", "February", "March", "April", "May", "June",
@@ -38,6 +39,38 @@ const patternHintKeys: Record<string, { titleKey: string; descriptionKey: string
   "self-doubt": { titleKey: "microReading.hint.selfDoubt.title", descriptionKey: "microReading.hint.selfDoubt.description", number: "3" },
 };
 
+/* -------------------------------------------------------------------------- */
+/*  Voice-intake helpers                                                      */
+/* -------------------------------------------------------------------------- */
+
+/** Convert a pattern id ("people-pleasing") into its i18n label key. */
+function patternIdToLabelKey(id: string): string {
+  switch (id) {
+    case "people-pleasing": return "microReading.pattern.peoplePleasing";
+    case "emotional-numbness": return "microReading.pattern.emotionalNumbness";
+    case "self-doubt": return "microReading.pattern.selfDoubt";
+    default: return `microReading.pattern.${id}`;
+  }
+}
+
+/** Convert a frustration id ("same-fight") into its i18n label key. */
+function frustrationIdToLabelKey(id: string): string {
+  switch (id) {
+    case "same-fight": return "microReading.frustration.sameFight";
+    case "attracting-wrong": return "microReading.frustration.attractingWrong";
+    case "cant-leave": return "microReading.frustration.cantLeave";
+    case "losing-myself": return "microReading.frustration.losingMyself";
+    default: return `microReading.frustration.${id}`;
+  }
+}
+
+/** Confidence threshold above which the UI auto-selects the matched option. */
+const AUTO_SELECT_CONFIDENCE = 0.85;
+
+type VoiceHeard =
+  | { kind: "matched"; value: string; displayLabel: string; confidence: number }
+  | { kind: "unclear"; transcription: string };
+
 export default function MicroReading() {
   const ref = useRef(null);
   const { t } = useI18n();
@@ -51,10 +84,26 @@ export default function MicroReading() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [resultRevealed, setResultRevealed] = useState(false);
 
+  // ─── Voice intake state (M6-d) ───
+  // Tracks what ASR just heard for the CURRENT step. Reset to null whenever
+  // the user advances to a different step. When `kind: 'matched'`, the
+  // matching option has already been auto-selected — the banner is purely
+  // confirmation ("we heard: January"). When `kind: 'unclear'`, the user
+  // must manually pick from the option list below.
+  const [voiceHeard, setVoiceHeard] = useState<VoiceHeard | null>(null);
+
+  // Clear voiceHeard on step change so a stale "we heard" banner doesn't
+  // carry over from a previous question.
+  useEffect(() => {
+    setVoiceHeard(null);
+  }, [step]);
+
   // ─── Enhancement #4: Persist partial state for abandoned-flow recovery ───
   // On every step change (and whenever the user types their email), send a
   // debounced POST to /api/micro-reading/partial so we can email them if they
   // abandon. Failures are silent — this must never break the user's flow.
+  // NOTE: voiceHeard is intentionally NOT in the deps — it's a transient UX
+  // state, not a meaningful quiz answer.
   useEffect(() => {
     if (step < 1) return; // no useful state until they've started
 
@@ -99,6 +148,67 @@ export default function MicroReading() {
     [primaryPattern, selectedFrustration]
   );
 
+  /* ─── Voice result handler ────────────────────────────────────────── */
+  // Called by VoiceInput when the user clicks "Use this" on a transcription.
+  //   - High confidence (≥ 0.85) with a matchedValue → auto-select the
+  //     matching option AND show the "we heard: X" confirmation banner.
+  //   - Lower confidence OR no match → don't auto-select; show the raw
+  //     transcription so the user can manually pick from the option list.
+  const handleVoiceResult = (currentStep: number, result: VoiceResult) => {
+    const { transcription, matchedValue, confidence } = result;
+
+    if (
+      matchedValue &&
+      typeof confidence === "number" &&
+      confidence >= AUTO_SELECT_CONFIDENCE
+    ) {
+      // Auto-select the matched option.
+      if (currentStep === 1) {
+        // Month matched value is the full English month name.
+        if (months.includes(matchedValue)) {
+          setSelectedMonth(matchedValue);
+        }
+        setVoiceHeard({
+          kind: "matched",
+          value: matchedValue,
+          displayLabel: matchedValue,
+          confidence,
+        });
+      } else if (currentStep === 2) {
+        // Multi-select: add the matched pattern if not already selected.
+        if (
+          emotionalPatternKeys.some((p) => p.id === matchedValue) &&
+          !selectedPatterns.includes(matchedValue)
+        ) {
+          setSelectedPatterns((prev) => [...prev, matchedValue]);
+        }
+        setVoiceHeard({
+          kind: "matched",
+          value: matchedValue,
+          displayLabel: t(patternIdToLabelKey(matchedValue)),
+          confidence,
+        });
+      } else if (currentStep === 3) {
+        if (frustrationKeys.some((f) => f.id === matchedValue)) {
+          setSelectedFrustration(matchedValue);
+        }
+        setVoiceHeard({
+          kind: "matched",
+          value: matchedValue,
+          displayLabel: t(frustrationIdToLabelKey(matchedValue)),
+          confidence,
+        });
+      }
+    } else {
+      // Low confidence or no match — surface the raw transcription and
+      // invite the user to manually pick from the option list.
+      setVoiceHeard({
+        kind: "unclear",
+        transcription: transcription || "",
+      });
+    }
+  };
+
   const handleEmailSubmit = async () => {
     if (!email) return;
     setIsSubmitting(true);
@@ -130,6 +240,45 @@ export default function MicroReading() {
     if (step === 2) return selectedPatterns.length > 0;
     if (step === 3) return selectedFrustration !== null;
     return true;
+  };
+
+  /* ─── "We heard" confirmation banner (rendered above the option grid) ─ */
+  const renderVoiceHeardBanner = () => {
+    if (!voiceHeard) return null;
+    return (
+      <motion.div
+        initial={{ opacity: 0, y: -4 }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0 }}
+        transition={{ duration: 0.3 }}
+        className="mb-6 bg-white/[0.02] border border-white/[0.04] p-3"
+        role="status"
+        aria-live="polite"
+        aria-label={t("microReading.voice.heardAria")}
+      >
+        <p
+          style={{ fontFamily: "var(--font-cinzel)" }}
+          className="text-[9px] tracking-[0.2em] uppercase text-[#c9a96e]/60 mb-2"
+        >
+          {t("microReading.voice.weHeard")}
+        </p>
+        {voiceHeard.kind === "matched" ? (
+          <p className="text-sm italic text-[#cfcabf] font-serif leading-relaxed">
+            {voiceHeard.displayLabel}
+            <span className="ml-2 not-italic text-[10px] tracking-wide text-[#7a7a7a]">
+              ({Math.round(voiceHeard.confidence * 100)}% · auto-selected)
+            </span>
+          </p>
+        ) : (
+          <p className="text-sm italic text-[#cfcabf] font-serif leading-relaxed">
+            &ldquo;{voiceHeard.transcription}&rdquo;
+            <span className="block not-italic text-[10px] tracking-[0.2em] uppercase text-[#7a7a7a] mt-1.5">
+              Pick the closest match below
+            </span>
+          </p>
+        )}
+      </motion.div>
+    );
   };
 
   return (
@@ -189,6 +338,9 @@ export default function MicroReading() {
                   </h3>
                 </div>
 
+                {/* "We heard:" confirmation banner (M6-d) */}
+                {renderVoiceHeardBanner()}
+
                 <div className="grid grid-cols-3 sm:grid-cols-4 gap-2" role="group" aria-label="Birth month selection">
                   {months.map((month, i) => (
                     <button
@@ -205,6 +357,14 @@ export default function MicroReading() {
                       {month.slice(0, 3)}
                     </button>
                   ))}
+                </div>
+
+                {/* Voice input — alternative to clicking the month buttons */}
+                <div className="mt-8 pt-6 border-t border-white/[0.04]">
+                  <VoiceInput
+                    step={1}
+                    onResult={(r) => handleVoiceResult(1, r)}
+                  />
                 </div>
               </motion.div>
             )}
@@ -224,6 +384,9 @@ export default function MicroReading() {
                     {t("microReading.step2Question")}
                   </h3>
                 </div>
+
+                {/* "We heard:" confirmation banner (M6-d) */}
+                {renderVoiceHeardBanner()}
 
                 <div className="border-t border-white/[0.06]" role="group" aria-label="Emotional pattern selection">
                   {emotionalPatternKeys.map((pattern, i) => (
@@ -251,6 +414,14 @@ export default function MicroReading() {
                     </button>
                   ))}
                 </div>
+
+                {/* Voice input — alternative to clicking the pattern buttons */}
+                <div className="mt-8 pt-6 border-t border-white/[0.04]">
+                  <VoiceInput
+                    step={2}
+                    onResult={(r) => handleVoiceResult(2, r)}
+                  />
+                </div>
               </motion.div>
             )}
 
@@ -269,6 +440,9 @@ export default function MicroReading() {
                     {t("microReading.step3Question")}
                   </h3>
                 </div>
+
+                {/* "We heard:" confirmation banner (M6-d) */}
+                {renderVoiceHeardBanner()}
 
                 <div className="border-t border-white/[0.06]" role="group" aria-label="Frustration selection">
                   {frustrationKeys.map((item, i) => (
@@ -295,6 +469,14 @@ export default function MicroReading() {
                       </div>
                     </button>
                   ))}
+                </div>
+
+                {/* Voice input — alternative to clicking the frustration buttons */}
+                <div className="mt-8 pt-6 border-t border-white/[0.04]">
+                  <VoiceInput
+                    step={3}
+                    onResult={(r) => handleVoiceResult(3, r)}
+                  />
                 </div>
               </motion.div>
             )}

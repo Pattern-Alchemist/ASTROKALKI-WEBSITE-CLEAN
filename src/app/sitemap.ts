@@ -128,6 +128,21 @@ export default function sitemap(): MetadataRoute.Sitemap {
       priority: 0.7,
     },
     {
+      // Lead magnet — free 5-day email course landing page.
+      // High priority because it converts cold traffic into email opt-ins.
+      url: `${BASE_URL}/email-course`,
+      lastModified: now,
+      changeFrequency: "monthly",
+      priority: 0.8,
+    },
+    {
+      // AI-powered birth chart image analysis — VLM lead magnet.
+      url: `${BASE_URL}/chart-reading`,
+      lastModified: now,
+      changeFrequency: "monthly",
+      priority: 0.8,
+    },
+    {
       url: `${BASE_URL}/refer`,
       lastModified: now,
       changeFrequency: "monthly",

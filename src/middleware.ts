@@ -155,7 +155,14 @@ export async function middleware(request: NextRequest) {
       pathname.startsWith('/api/testimonials') ||
       pathname.startsWith('/api/referrals') ||
       pathname.startsWith('/api/slots') ||
-      pathname.startsWith('/api/preferences'));
+      pathname.startsWith('/api/preferences') ||
+      pathname.startsWith('/api/ai/chat') ||
+      pathname.startsWith('/api/ai/chart') ||
+      pathname.startsWith('/api/ai/voice-reading') ||
+      pathname.startsWith('/api/ai/portrait') ||
+      pathname.startsWith('/api/journal') ||
+      pathname.startsWith('/api/email-course') ||
+      pathname.startsWith('/api/tts'));
 
   // Paths that bypass all public-POST guards (verified via signature instead)
   const isSignatureVerifiedPost =
@@ -190,10 +197,13 @@ export async function middleware(request: NextRequest) {
     // We can't read the body here in middleware (Next.js streams it), but we
     // CAN check the Content-Length header. If it's missing or absurdly large,
     // reject early. Route handlers also enforce this on the parsed body.
-    // Stripe webhooks can be larger, so allow up to 64KB for that path.
-    const maxBody = pathname.startsWith('/api/stripe/webhook')
-      ? 64 * 1024
-      : MAX_POST_BODY_BYTES;
+    // Allow larger payloads for AI endpoints (base64 images/audio) and Stripe webhooks.
+    const isLargePayloadPath =
+      pathname.startsWith('/api/stripe/webhook') ||
+      pathname.startsWith('/api/ai/chart') ||
+      pathname.startsWith('/api/ai/voice-reading') ||
+      pathname.startsWith('/api/ai/portrait');
+    const maxBody = isLargePayloadPath ? 10 * 1024 * 1024 : MAX_POST_BODY_BYTES; // 10MB for AI, 4KB otherwise
     const contentLength = parseInt(request.headers.get('content-length') || '0', 10);
     if (contentLength > maxBody) {
       const res = NextResponse.json(

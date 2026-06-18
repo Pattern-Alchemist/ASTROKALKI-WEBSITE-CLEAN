@@ -84,6 +84,12 @@ export default function Footer() {
               <Link href="/patterns" className="block text-[11px] text-[#7a7a7a] hover:text-[#c9a96e] transition-colors">
                 Pattern Library
               </Link>
+              <Link href="/email-course" className="block text-[11px] text-[#7a7a7a] hover:text-[#c9a96e] transition-colors" title="Free 5-day email course — Pattern Recognition Foundations">
+                5-Day Course
+              </Link>
+              <Link href="/chart-reading" className="block text-[11px] text-[#7a7a7a] hover:text-[#c9a96e] transition-colors" title="Upload your birth chart — AI pattern recognition analysis">
+                Chart Reading
+              </Link>
             </div>
           </div>
 
@@ -149,6 +155,18 @@ export default function Footer() {
                 className="block text-[11px] text-[#7a7a7a] hover:text-[#c9a96e] transition-colors"
               >
                 Member portal
+              </Link>
+              <Link
+                href="/ask-astrokalki"
+                className="block text-[11px] text-[#7a7a7a] hover:text-[#c9a96e] transition-colors"
+              >
+                Ask AstroKalki AI
+              </Link>
+              <Link
+                href="/journal"
+                className="block text-[11px] text-[#7a7a7a] hover:text-[#c9a96e] transition-colors"
+              >
+                Pattern Journal
               </Link>
 
               <div className="flex gap-3 mt-5">

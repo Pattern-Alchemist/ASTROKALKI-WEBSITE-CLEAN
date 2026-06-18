@@ -1,16 +1,19 @@
 import Link from "next/link";
+import { Suspense } from "react";
 import type { Metadata } from "next";
 import Breadcrumbs from "@/components/astrokalki/breadcrumbs";
 import SignInForm from "@/components/astrokalki/sign-in-form";
 import SignOutButton from "@/components/astrokalki/sign-out-button";
 import PortalLink from "@/components/astrokalki/portal-link";
 import PreferencesForm from "@/components/astrokalki/preferences-form";
+import AiChat from "@/components/astrokalki/ai-chat";
 import RecordingsList, {
   type AccountRecording,
 } from "@/app/account/RecordingsList";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { db } from "@/lib/db";
+import { getAtlasPattern } from "@/lib/content/patterns/atlas";
 
 /**
  * /account — the AstroKalki member portal.
@@ -138,8 +141,8 @@ export default async function AccountPage() {
   const userId = (session.user as { id?: string }).id;
   const name = session.user.name || email.split("@")[0];
 
-  // Parallel data fetch: membership + bookings + recordings + newsletter prefs.
-  const [membership, bookings, recordings, newsletter] = await Promise.all([
+  // Parallel data fetch: membership + bookings + chart analyses + recordings + pattern portraits + journal entries + newsletter prefs.
+  const [membership, bookings, chartAnalyses, recordings, portraits, journalAgg, newsletter] = await Promise.all([
     db.membership.findFirst({
       where: {
         OR: [
@@ -171,6 +174,18 @@ export default async function AccountPage() {
         contexts: true,
       },
     }),
+    db.chartAnalysis.findMany({
+      where: { email },
+      orderBy: { createdAt: "desc" },
+      take: 20,
+      select: {
+        id: true,
+        imageUrl: true,
+        analysis: true,
+        identifiedPatterns: true,
+        createdAt: true,
+      },
+    }),
     db.recordedReading.findMany({
       where: {
         booking: { email },
@@ -192,6 +207,25 @@ export default async function AccountPage() {
         },
       },
     }),
+    db.patternPortrait.findMany({
+      where: { email },
+      orderBy: { createdAt: "desc" },
+      take: 30,
+      select: {
+        id: true,
+        pattern: true,
+        imageUrl: true,
+        createdAt: true,
+      },
+    }),
+    // Journal aggregate — total count + most recent entry date.
+    db.journalEntry
+      .aggregate({
+        where: { email },
+        _count: { _all: true },
+        _max: { date: true },
+      })
+      .catch(() => ({ _count: { _all: 0 }, _max: { date: null } })),
     db.newsletter.findUnique({
       where: { email },
       select: {
@@ -205,6 +239,9 @@ export default async function AccountPage() {
     null,
     [],
     [],
+    [],
+    [],
+    { _count: { _all: 0 }, _max: { date: null } },
     null,
   ] as const);
 
@@ -253,6 +290,51 @@ export default async function AccountPage() {
       </header>
 
       <div className="max-w-4xl mx-auto px-6 sm:px-10 py-16 sm:py-24">
+        {/* ─── Ask AstroKalki — AI assistant (member exclusive) ───────────── */}
+        {/* The killer feature of the portal. Surfaced at the top so members
+            see it before the account-management panels below. */}
+        <section className="mb-20">
+          <p className="text-[10px] tracking-[0.4em] uppercase text-[#c9a96e]/60 mb-4 font-light">
+            AI Assistant · Member exclusive
+          </p>
+          <h2 className="text-3xl sm:text-4xl font-serif text-[#f0eee9] font-light tracking-[-0.02em] mb-4">
+            Ask AstroKalki.
+          </h2>
+          <p className="text-base text-[#9a9a9a] font-light leading-[1.7] max-w-2xl mb-6">
+            An AI trained on the 10 Atlas patterns and 25 essays — available
+            24/7. Ask about the loops you can&apos;t break, the partners who
+            keep returning, the feelings that have no name. The voice is
+            direct, second-person, no mystical jargon. Not prediction.
+            Pattern recognition.
+          </p>
+          <div className="mb-6">
+            <Link
+              href="/ask-astrokalki"
+              className="inline-flex items-center gap-3 text-[11px] tracking-[0.3em] uppercase text-[#c9a96e] border-b border-[#c9a96e]/40 pb-2 hover:border-[#c9a96e] hover:text-[#f0eee9] transition-colors"
+            >
+              Open full chat experience
+              <span>→</span>
+            </Link>
+          </div>
+          {/* Suspense boundary required because AiChat uses useSearchParams
+              (Next.js 16 static-render guard). */}
+          <Suspense
+            fallback={
+              <div className="bg-[#0a0a0a] border border-white/[0.06] rounded-lg h-[640px] flex items-center justify-center">
+                <p className="text-[11px] text-[#5a5a5a] font-light tracking-wide">
+                  Loading chat…
+                </p>
+              </div>
+            }
+          >
+            <AiChat
+              isAuthenticated
+              email={email}
+              variant="embedded"
+            />
+          </Suspense>
+        </section>
+
         {/* ─── I. Membership status ─────────────────────────────────────── */}
         <section className="mb-20">
           <p className="text-[10px] tracking-[0.4em] uppercase text-[#c9a96e]/60 mb-4 font-light">
@@ -450,14 +532,115 @@ export default async function AccountPage() {
           )}
         </section>
 
+        {/* ─── Chart analyses (VLM-powered birth chart readings) ───────── */}
+        {/* Placed between session history and recordings so members see the
+            pattern-recognition work they've done before the session audio.
+            Roman numeral is dynamic based on whether the subscription
+            management section (active members only) is shown. */}
+        <section className="mb-20">
+          <p className="text-[10px] tracking-[0.4em] uppercase text-[#c9a96e]/60 mb-4 font-light">
+            <span className="font-mono mr-3">{activeMembership ? "IV." : "III."}</span>
+            Chart analyses
+          </p>
+          <h2 className="text-3xl sm:text-4xl font-serif text-[#f0eee9] font-light tracking-[-0.02em] mb-4">
+            Your pattern-recognition readings.
+          </h2>
+          <p className="text-base text-[#9a9a9a] font-light leading-[1.7] max-w-2xl mb-8">
+            Every chart you upload to the chart-reading tool is archived here.
+            The model&apos;s analysis and the identified Atlas patterns stay
+            with your account so you can revisit them — and track how your
+            patterns shift over time.
+          </p>
+
+          {chartAnalyses && chartAnalyses.length > 0 ? (
+            <div className="border-t border-white/[0.06]">
+              {chartAnalyses.map((analysis, idx) => {
+                let identifiedPatterns: string[] = [];
+                try {
+                  const parsed = JSON.parse(analysis.identifiedPatterns);
+                  if (Array.isArray(parsed)) {
+                    identifiedPatterns = parsed.filter(
+                      (s): s is string => typeof s === "string"
+                    );
+                  }
+                } catch {
+                  // Malformed JSON in DB — leave empty.
+                }
+                return (
+                  <div
+                    key={analysis.id}
+                    className="py-6 border-b border-white/[0.06] grid grid-cols-1 sm:grid-cols-12 gap-4"
+                  >
+                    <div className="sm:col-span-1">
+                      <span className="text-[11px] tracking-[0.2em] text-[#c9a96e]/40 font-mono">
+                        {String(idx + 1).padStart(2, "0")}
+                      </span>
+                    </div>
+                    <div className="sm:col-span-7">
+                      <p className="text-xs text-[#7a7a7a] font-light tracking-wide mb-2">
+                        {formatDateTime(analysis.createdAt)}
+                      </p>
+                      <p
+                        className="text-sm text-[#cfcabf] font-light leading-[1.8] line-clamp-3"
+                        style={{ fontFamily: '"Playfair Display", Georgia, serif' }}
+                      >
+                        {analysis.analysis}
+                      </p>
+                    </div>
+                    <div className="sm:col-span-4">
+                      <p className="text-[10px] tracking-[0.25em] uppercase text-[#5a5a5a] mb-2 font-light">
+                        Patterns
+                      </p>
+                      {identifiedPatterns.length > 0 ? (
+                        <div className="flex flex-wrap gap-2">
+                          {identifiedPatterns.map((slug) => (
+                            <Link
+                              key={slug}
+                              href={`/patterns/atlas/${slug}`}
+                              className="text-[10px] text-[#c9a96e] border border-[#c9a96e]/30 hover:bg-[#c9a96e]/10 px-3 py-1 font-light rounded-full uppercase tracking-[0.15em] transition-colors"
+                              style={{ fontFamily: '"Cinzel", Georgia, serif' }}
+                            >
+                              {slug
+                                .replace(/^the-/, "")
+                                .replace(/-/g, " ")}
+                            </Link>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-xs text-[#5a5a5a] font-light italic">
+                          No patterns identified
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="border-t border-white/[0.06] py-10 border-b border-white/[0.06]">
+              <p className="text-base text-[#9a9a9a] font-light leading-[1.8] mb-6 max-w-md">
+                No chart analyses yet. Upload a birth chart image to get a
+                pattern-recognition reading from the model.
+              </p>
+              <Link
+                href="/chart-reading"
+                className="inline-flex items-center gap-3 text-[11px] tracking-[0.3em] uppercase text-[#c9a96e] border-b border-[#c9a96e]/40 pb-2 hover:border-[#c9a96e] hover:text-[#f0eee9] transition-colors"
+              >
+                Upload your chart
+                <span>→</span>
+              </Link>
+            </div>
+          )}
+        </section>
+
         {/* ─── "Your recordings" section ────────────────────────────────── */}
-        {/* Placed between session history and email preferences so members
+        {/* Placed between chart analyses and email preferences so members
             who have completed a session can find the audio right after the
             booking record. Roman numeral is dynamic based on whether the
             subscription-management section (active members only) is shown. */}
         <section className="mb-20">
           <p className="text-[10px] tracking-[0.4em] uppercase text-[#c9a96e]/60 mb-4 font-light">
-            <span className="font-mono mr-3">{activeMembership ? "IV." : "III."}</span>
+            <span className="font-mono mr-3">{activeMembership ? "V." : "IV."}</span>
             Your recordings
           </p>
           <h2 className="text-3xl sm:text-4xl font-serif text-[#f0eee9] font-light tracking-[-0.02em] mb-4">
@@ -473,10 +656,156 @@ export default async function AccountPage() {
           <RecordingsList recordings={accountRecordings} memberEmail={email} />
         </section>
 
-        {/* ─── V. Email preferences ────────────────────────────────────── */}
+        {/* ─── Pattern portraits ─────────────────────────────────────────── */}
+        {/* AI-generated visuals the user created from a micro-reading or
+            quiz result. Each portrait is keyed by their email + the Atlas
+            pattern slug. Renders as an editorial gallery — image is the
+            hero, pattern name + date as caption, click-through to the
+            pattern page. */}
         <section className="mb-20">
           <p className="text-[10px] tracking-[0.4em] uppercase text-[#c9a96e]/60 mb-4 font-light">
-            <span className="font-mono mr-3">{activeMembership ? "V." : "IV."}</span>
+            <span className="font-mono mr-3">{activeMembership ? "VI." : "V."}</span>
+            Pattern portraits
+          </p>
+          <h2 className="text-3xl sm:text-4xl font-serif text-[#f0eee9] font-light tracking-[-0.02em] mb-4">
+            The visuals you&apos;ve generated.
+          </h2>
+          <p className="text-base text-[#9a9a9a] font-light leading-[1.7] max-w-2xl mb-8">
+            One-of-a-kind AI portraits created from your pattern results — abstract, cinematic, yours. Click any portrait to revisit the pattern it came from.
+          </p>
+
+          {portraits && portraits.length > 0 ? (
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-6">
+              {portraits.map((p) => {
+                const atlasPattern = getAtlasPattern(p.pattern);
+                const created =
+                  p.createdAt instanceof Date ? p.createdAt : new Date(p.createdAt);
+                return (
+                  <Link
+                    key={p.id}
+                    href={
+                      atlasPattern
+                        ? `/patterns/atlas/${atlasPattern.slug}`
+                        : "/patterns/atlas"
+                    }
+                    className="group block border border-[#c9a96e]/20 p-2 bg-[#0a0a0a] hover:border-[#c9a96e]/40 transition-colors duration-300"
+                  >
+                    <div className="relative aspect-square overflow-hidden bg-[#050505]">
+                      <img
+                        src={p.imageUrl}
+                        alt={`AI pattern portrait for ${atlasPattern?.name ?? p.pattern}`}
+                        className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-[1.03]"
+                        loading="lazy"
+                      />
+                      <div className="pointer-events-none absolute inset-0 ring-1 ring-inset ring-[#c9a96e]/10" />
+                    </div>
+                    <p
+                      className="text-[10px] tracking-[0.25em] uppercase text-[#c9a96e] mt-3 mb-1 font-light"
+                      style={{ fontFamily: "var(--font-cinzel)" }}
+                    >
+                      {atlasPattern?.name?.replace(" Pattern", "") ?? "Pattern"}
+                    </p>
+                    <p className="text-[10px] tracking-wide text-[#5a5a5a] font-mono">
+                      {created.toLocaleDateString("en-IN", {
+                        year: "numeric",
+                        month: "short",
+                        day: "numeric",
+                      })}
+                    </p>
+                  </Link>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="border-t border-white/[0.06] py-10 border-b border-white/[0.06]">
+              <p className="text-base text-[#9a9a9a] font-light leading-[1.8] mb-6 max-w-md">
+                No pattern portraits yet. Take the micro-reading or the Atlas quiz, then generate a one-of-a-kind visual of your pattern.
+              </p>
+              <div className="flex flex-wrap gap-6">
+                <Link
+                  href="/#micro-reading"
+                  className="inline-flex items-center gap-3 text-[11px] tracking-[0.3em] uppercase text-[#c9a96e] border-b border-[#c9a96e]/40 pb-2 hover:border-[#c9a96e] hover:text-[#f0eee9] transition-colors"
+                >
+                  Take the micro-reading
+                  <span>→</span>
+                </Link>
+                <Link
+                  href="/patterns/atlas/quiz"
+                  className="inline-flex items-center gap-3 text-[11px] tracking-[0.3em] uppercase text-[#7a7a7a] border-b border-white/[0.08] pb-2 hover:border-[#c9a96e]/40 hover:text-[#c9a96e] transition-colors"
+                >
+                  Take the Atlas quiz
+                  <span>→</span>
+                </Link>
+              </div>
+            </div>
+          )}
+        </section>
+
+        {/* ─── Pattern Journal ────────────────────────────────────────────── */}
+        {/* A daily emotional weather log — members log mood, energy, trigger,
+            and pattern daily; weekly, the LLM synthesises what surfaced.
+            Surfaces here as a teaser card with the entry count + last-log
+            date, linking to /journal for the full experience. */}
+        <section className="mb-20">
+          <p className="text-[10px] tracking-[0.4em] uppercase text-[#c9a96e]/60 mb-4 font-light">
+            <span className="font-mono mr-3">{activeMembership ? "VII." : "VI."}</span>
+            Pattern Journal
+          </p>
+          <h2 className="text-3xl sm:text-4xl font-serif text-[#f0eee9] font-light tracking-[-0.02em] mb-4">
+            The shape of your week.
+          </h2>
+          <p className="text-base text-[#9a9a9a] font-light leading-[1.7] max-w-2xl mb-8">
+            A daily emotional weather log — five quiet minutes a day. Over
+            time, the patterns you can&apos;t see in any single day surface on
+            their own. Each week, the LLM reads your entries and writes back
+            a synthesis in the AstroKalki voice.
+          </p>
+
+          <div className="border-t border-white/[0.06] border-b border-white/[0.06] py-8">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 sm:gap-8 mb-8">
+              <div>
+                <p className="text-[10px] tracking-[0.3em] uppercase text-[#5a5a5a] mb-2 font-light">
+                  Total entries
+                </p>
+                <p className="text-2xl font-serif text-[#f0eee9] font-light font-mono">
+                  {journalAgg?._count?._all ?? 0}
+                </p>
+              </div>
+              <div>
+                <p className="text-[10px] tracking-[0.3em] uppercase text-[#5a5a5a] mb-2 font-light">
+                  Last logged
+                </p>
+                <p className="text-base text-[#cfcabf] font-light">
+                  {journalAgg?._max?.date
+                    ? formatDate(journalAgg._max.date)
+                    : "—"}
+                </p>
+              </div>
+              <div>
+                <p className="text-[10px] tracking-[0.3em] uppercase text-[#5a5a5a] mb-2 font-light">
+                  Cadence
+                </p>
+                <p className="text-base text-[#cfcabf] font-light">
+                  Daily · 5 minutes
+                </p>
+              </div>
+            </div>
+            <Link
+              href="/journal"
+              className="inline-flex items-center gap-3 text-[11px] tracking-[0.3em] uppercase text-[#c9a96e] border-b border-[#c9a96e]/40 pb-2 hover:border-[#c9a96e] hover:text-[#f0eee9] transition-colors"
+            >
+              {(journalAgg?._count?._all ?? 0) > 0
+                ? "Open your journal"
+                : "Begin your journal"}
+              <span>→</span>
+            </Link>
+          </div>
+        </section>
+
+        {/* ─── Email preferences ────────────────────────────────────────── */}
+        <section className="mb-20">
+          <p className="text-[10px] tracking-[0.4em] uppercase text-[#c9a96e]/60 mb-4 font-light">
+            <span className="font-mono mr-3">{activeMembership ? "VIII." : "VII."}</span>
             Email preferences
           </p>
           <h2 className="text-3xl sm:text-4xl font-serif text-[#f0eee9] font-light tracking-[-0.02em] mb-4">

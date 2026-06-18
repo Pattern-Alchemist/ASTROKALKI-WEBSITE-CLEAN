@@ -338,3 +338,64 @@ html { scroll-behavior: smooth; }
   outline: 1px solid rgba(201, 169, 110, 0.4);
   outline-offset: 2px;
 }
+
+/* ═══════════════════════════════════════
+   PATTERN JOURNAL — ENERGY SLIDER
+   Native range input re-skinned in gold.
+   ═══════════════════════════════════════ */
+.journal-energy-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 1px;
+  background: rgba(255, 255, 255, 0.1);
+  outline: none;
+  cursor: pointer;
+}
+
+.journal-energy-slider::-webkit-slider-runnable-track {
+  height: 1px;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.journal-energy-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #c9a96e;
+  border: 2px solid #050505;
+  margin-top: -7px;
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.journal-energy-slider::-webkit-slider-thumb:hover {
+  transform: scale(1.2);
+  box-shadow: 0 0 0 6px rgba(201, 169, 110, 0.15);
+}
+
+.journal-energy-slider::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #c9a96e;
+  border: 2px solid #050505;
+  cursor: pointer;
+}
+
+.journal-energy-slider::-moz-range-track {
+  height: 1px;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+/* Pattern Journal — dark date input calendar indicator */
+.journal-date-input::-webkit-calendar-picker-indicator {
+  filter: invert(0.6) sepia(1) saturate(2) hue-rotate(5deg);
+  cursor: pointer;
+  opacity: 0.7;
+}
+
+.journal-date-input::-webkit-calendar-picker-indicator:hover {
+  opacity: 1;
+}

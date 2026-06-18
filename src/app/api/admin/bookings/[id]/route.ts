@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
+import { dispatchRecapEmail } from '@/lib/session-emails';
 
 export async function PATCH(
   request: NextRequest,
@@ -30,6 +31,23 @@ export async function PATCH(
       where: { id },
       data: { status },
     });
+
+    // ─── Trigger recap email when admin marks a session as completed ─
+    // Only fire on the transition INTO "completed" — not on every PATCH.
+    // The dispatch helper is idempotent (SessionRecap row + recapSentAt
+    // guard re-sends), so even a repeat PATCH won't double-send.
+    //
+    // Non-blocking — failures are logged but never block the status update.
+    // The recap endpoint at /api/session-emails/recap can be called
+    // manually to re-send if this ever fails silently.
+    if (status === 'completed' && existing.status !== 'completed') {
+      dispatchRecapEmail(id).catch((err) => {
+        console.error(
+          `[admin/bookings] recap email dispatch failed for ${id}:`,
+          err
+        );
+      });
+    }
 
     return NextResponse.json({ booking });
   } catch (error) {

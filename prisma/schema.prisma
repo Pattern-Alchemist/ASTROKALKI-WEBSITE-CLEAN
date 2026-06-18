@@ -263,3 +263,88 @@ model SiteConfig {
   value     String
   updatedAt DateTime @updatedAt
 }
+
+// ─── M6-a: AI Chat history (Ask AstroKalki) ───
+model ChatConversation {
+  id        String   @id @default(cuid())
+  email     String   // member email
+  title     String   @default("New conversation")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  messages  ChatMessage[]
+}
+
+model ChatMessage {
+  id              String   @id @default(cuid())
+  conversationId  String
+  role            String   // "user" | "assistant"
+  content         String
+  createdAt       DateTime @default(now())
+  conversation    ChatConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+}
+
+// ─── M6-b: Birth chart analysis (VLM) ───
+model ChartAnalysis {
+  id            String   @id @default(cuid())
+  email         String
+  imageUrl      String   // stored chart image path
+  analysis      String   // VLM-generated interpretation
+  identifiedPatterns String // JSON array of pattern slugs
+  createdAt     DateTime @default(now())
+}
+
+// ─── M6-c: Audio narration tracking (TTS) ───
+model AudioNarration {
+  id        String   @id @default(cuid())
+  slug      String   @unique // article slug
+  title     String
+  audioUrl  String
+  duration  Int      // seconds
+  voice     String   @default("tongtong")
+  createdAt DateTime @default(now())
+}
+
+// ─── M6-e: Pattern portrait (Image Generation) ───
+model PatternPortrait {
+  id        String   @id @default(cuid())
+  email     String
+  pattern   String   // atlas pattern slug
+  prompt    String
+  imageUrl  String
+  createdAt DateTime @default(now())
+}
+
+// ─── M7-a: Email course enrollment ───
+model EmailCourseEnrollment {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  stage        Int      @default(0) // 0=enrolled, 1=day1, 2=day2, 3=day3, 4=day4, 5=day5, 6=complete
+  lastSentAt   DateTime?
+  completedAt  DateTime?
+  createdAt    DateTime @default(now())
+}
+
+// ─── M7-b: Pattern Journal ───
+model JournalEntry {
+  id          String   @id @default(cuid())
+  email       String
+  date        DateTime
+  mood        String   // "heavy" | "numb" | "anxious" | "clear" | "angry" | "tender"
+  energy      Int      // 1-5
+  trigger     String?  // what triggered them today
+  pattern     String?  // recognized pattern slug
+  note        String?  // free-text reflection
+  insight     String?  // AI-generated insight (optional, generated weekly)
+  createdAt   DateTime @default(now())
+}
+
+// ─── M7-c: Session recap tracking ───
+model SessionRecap {
+  id          String   @id @default(cuid())
+  bookingId   String   @unique
+  email       String
+  prepSentAt  DateTime?
+  recapSentAt DateTime?
+  integrationPrompts String? // JSON array of prompts
+  createdAt   DateTime @default(now())
+}
