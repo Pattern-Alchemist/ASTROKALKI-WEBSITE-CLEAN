@@ -348,3 +348,112 @@ model SessionRecap {
   integrationPrompts String? // JSON array of prompts
   createdAt   DateTime @default(now())
 }
+
+// ─── M8-b: Programmatic SEO city × pattern pages ───
+model ProgrammaticPage {
+  id          String   @id @default(cuid())
+  slug        String   @unique // e.g. "abandonment-loop-mumbai"
+  pattern     String   // atlas pattern slug
+  city        String   // city name
+  state       String?  // Indian state
+  content     String   // generated page content (markdown)
+  searchQuery String   // target search query
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// ─── M8-c: AI-generated social share images ───
+model SocialImage {
+  id        String   @id @default(cuid())
+  slug      String   @unique // article/guide slug
+  imageUrl  String
+  prompt    String
+  createdAt DateTime @default(now())
+}
+
+// ─── M9-a: Verified reviews (testimonial → booking link) ───
+// Extends Testimonial model with bookingId field (added via migration-safe optional field)
+// Reuse Testimonial model; add bookingId as optional String? — but to avoid schema conflicts,
+// we store the verification in a separate model.
+model VerifiedReview {
+  id            String   @id @default(cuid())
+  testimonialId String   @unique
+  bookingId     String
+  verifiedAt    DateTime @default(now())
+}
+
+// ─── M9-c: A/B testing experiments ───
+model Experiment {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  page        String   // e.g. "hero", "booking_cta"
+  variants    String   // JSON array of variant definitions
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  assignments ExperimentAssignment[]
+}
+
+model ExperimentAssignment {
+  id            String   @id @default(cuid())
+  experimentId  String
+  sessionId     String   // anonymous session ID (cookie)
+  variant       String   // variant name
+  converted     Boolean  @default(false)
+  createdAt     DateTime @default(now())
+  experiment    Experiment @relation(fields: [experimentId], references: [id], onDelete: Cascade)
+
+  @@unique([experimentId, sessionId])
+}
+
+// ─── M9-d: Case studies ───
+model CaseStudy {
+  id          String   @id @default(cuid())
+  slug        String   @unique
+  title       String
+  pattern     String   // primary pattern
+  clientInitials String
+  clientAge   Int?
+  consentGiven Boolean @default(false)
+  problem     String   // markdown
+  patternSection String // markdown — the pattern identified
+  session     String   // markdown — what happened in session
+  shift       String   // markdown — the shift that occurred
+  published   Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// ─── M10-a: Birth charts (calculated) ───
+model BirthChart {
+  id          String   @id @default(cuid())
+  email       String
+  name        String
+  birthDate   String
+  birthTime   String
+  birthPlace  String
+  lat         Float?
+  lng         Float?
+  tzOffset    Float?   // hours
+  chartData   String   // JSON: planetary positions, houses, aspects
+  svgChart    String?  // rendered SVG
+  createdAt   DateTime @default(now())
+}
+
+// ─── M10-b/c: Transits ───
+model TransitCache {
+  id        String   @id @default(cuid())
+  date      DateTime @unique
+  planets   String   // JSON: { sun: {sign, degree}, moon: {...}, ... }
+  createdAt DateTime @default(now())
+}
+
+model UserTransit {
+  id          String   @id @default(cuid())
+  email       String
+  date        DateTime
+  transitData String   // JSON
+  patternActivation String? // JSON: which user patterns are activated
+  insight     String?  // AI-generated insight
+  createdAt   DateTime @default(now())
+}

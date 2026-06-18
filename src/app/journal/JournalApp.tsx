@@ -6,6 +6,8 @@ import JournalCharts from "./JournalCharts";
 import InsightPanel from "./InsightPanel";
 import CalendarGrid from "./CalendarGrid";
 import PastEntries from "./PastEntries";
+import JournalCheckIn, { type CheckInResult } from "./JournalCheckIn";
+import UpcomingActivations from "./UpcomingActivations";
 import {
   type JournalEntryDTO,
   formatLongDate,
@@ -34,6 +36,8 @@ interface JournalAppProps {
   email: string;
   /** Display name (falls back to email handle). */
   name?: string | null;
+  /** Today's check-in, if the member already ran one (server pre-fetch). */
+  initialCheckIn?: CheckInResult | null;
 }
 
 function pad2(n: number): string {
@@ -50,10 +54,14 @@ export default function JournalApp({
   initialEntries,
   email,
   name,
+  initialCheckIn,
 }: JournalAppProps) {
   const [entries, setEntries] = useState<JournalEntryDTO[]>(initialEntries);
   const todayIso = useMemo(() => isoDay(new Date()), []);
   const [selectedDate, setSelectedDate] = useState<string>(todayIso);
+  // The "seed" note text from a check-in's journal prompt, applied to the
+  // form when the user clicks "Write in journal" inside JournalCheckIn.
+  const [noteSeed, setNoteSeed] = useState<string | null>(null);
 
   // ─── Resolve which entry is "today's" / the selected date's entry ─────
   const selectedEntry = useMemo(() => {
@@ -115,7 +123,21 @@ export default function JournalApp({
   const handleEditEntry = useCallback((entry: JournalEntryDTO) => {
     const d = new Date(entry.date);
     setSelectedDate(isoDay(d));
+    setNoteSeed(null);
     // Smooth-scroll to the form
+    if (typeof window !== "undefined") {
+      const form = document.getElementById("journal-form-section");
+      if (form) form.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  }, []);
+
+  // ─── "Write in journal" from the daily check-in ──────────────────────
+  // Scrolls to the form and seeds the note with the check-in's journal
+  // prompt. The form picks up `noteSeed` via its useEffect on mount; we
+  // bump the form's key (noteSeedKey) to force a fresh mount so the seed
+  // is applied cleanly.
+  const handleWriteInJournal = useCallback((prompt: string) => {
+    setNoteSeed(prompt);
     if (typeof window !== "undefined") {
       const form = document.getElementById("journal-form-section");
       if (form) form.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -180,6 +202,43 @@ export default function JournalApp({
       </header>
 
       <div className="max-w-5xl mx-auto px-6 sm:px-10 py-16 sm:py-24 space-y-20 sm:space-y-28">
+        {/* ─── 0. Daily transit check-in ─────────────────────────────────── */}
+        {/* Pairs with the /transits page + /api/transits/check-in. When the
+            member runs a check-in, we get an insight + activated patterns
+            + a journal prompt. The "Write in journal" button scrolls to
+            the form below and seeds the note with the prompt. */}
+        <section>
+          <p className="text-[10px] tracking-[0.4em] uppercase text-[#c9a96e]/60 mb-4 font-light">
+            <span className="font-mono mr-3">✦</span>
+            Daily transit check-in
+          </p>
+          <h2 className="text-3xl sm:text-4xl font-serif text-[#f0eee9] font-light tracking-[-0.02em] mb-3">
+            Today&apos;s pattern weather.
+          </h2>
+          <p className="text-base text-[#9a9a9a] font-light leading-[1.7] max-w-2xl mb-10">
+            Where the planets are today, what that activates in your chart,
+            and one prompt to take into the form below. One check-in per
+            day — the weather shifts tomorrow.
+          </p>
+
+          <JournalCheckIn
+            initialCheckIn={initialCheckIn ?? null}
+            onWriteInJournal={handleWriteInJournal}
+          />
+
+          {/* ─── Upcoming activations (M10-d) ───────────────────────────── */}
+          {/* Small widget showing the next 3 days of pattern activations,
+              linking to /pattern-calendar for the full 30-day forecast.
+              Pairs with the daily check-in above — "today's weather" +
+              "what's approaching" — so the member can prepare rather than
+              be ambushed. Fetches /api/transits/calendar client-side;
+              renders nothing if the fetch fails (the journal is still
+              fully usable without it). */}
+          <div className="mt-6">
+            <UpcomingActivations />
+          </div>
+        </section>
+
         {/* ─── I. Today's entry form ──────────────────────────────────────── */}
         <section id="journal-form-section">
           <p className="text-[10px] tracking-[0.4em] uppercase text-[#c9a96e]/60 mb-4 font-light">
@@ -198,10 +257,11 @@ export default function JournalApp({
 
           <div className="max-w-2xl">
             <JournalForm
-              key={selectedEntry?.id || selectedDate}
+              key={`${selectedEntry?.id || selectedDate}-${noteSeed ?? ""}`}
               initialEntry={selectedEntry}
               defaultDate={selectedDate}
               onSaved={handleSaved}
+              noteSeed={noteSeed}
             />
           </div>
         </section>

@@ -32,6 +32,11 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   const pattern = getAtlasPattern(slug);
   if (!pattern) return { title: "Pattern not found — AstroKalki" };
 
+  // AI-generated social card endpoint — streams the AI PNG if one has been
+  // generated for this slug, otherwise 307-redirects to /api/og which
+  // renders the programmatic fallback poster.
+  const socialImageUrl = `/api/ai/social-image/${slug}`;
+
   return {
     title: `${pattern.name} — AstroKalki`,
     description: pattern.metaDescription,
@@ -42,13 +47,15 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
       type: "article",
       url: `https://astrokalki.com/patterns/atlas/${slug}`,
       siteName: "AstroKalki",
-      images: [{ url: "/api/og", width: 1200, height: 630, alt: pattern.name }],
+      images: [
+        { url: socialImageUrl, width: 1344, height: 768, alt: pattern.name },
+      ],
     },
     twitter: {
       card: "summary_large_image",
       title: pattern.name,
       description: pattern.metaDescription,
-      images: ["/api/og"],
+      images: [socialImageUrl],
     },
     keywords: [
       pattern.targetKeyword,

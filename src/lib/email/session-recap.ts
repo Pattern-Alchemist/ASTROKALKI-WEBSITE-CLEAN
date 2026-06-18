@@ -91,6 +91,16 @@ export async function renderRecapEmail(
 
   const subject = `${firstName}, your integration prompts.`;
 
+  // ─── Booking-specific testimonial submit URL ─────────────────────
+  // Pre-fills booking reference + email on the submit form so the
+  // testimonial can be auto-verified (skip moderation, get "Verified
+  // Session" badge).
+  const reviewParams = new URLSearchParams({
+    booking: booking.id,
+    email: booking.email,
+  });
+  const reviewSubmitUrl = `${SITE_URL}/testimonials/submit?${reviewParams.toString()}`;
+
   // ─── Plain text body ──────────────────────────────────────────
   const textBody = [
     `${booking.name},`,
@@ -107,7 +117,7 @@ export async function renderRecapEmail(
     ``,
     `Journal: ${SITE_URL}/journal`,
     `Book a follow-up: ${SITE_URL}/#booking`,
-    `Rate your session: ${SITE_URL}/testimonials/submit`,
+    `Share your experience: ${reviewSubmitUrl}`,
     ``,
     `— AstroKalki`,
   ].join("\n");
@@ -145,9 +155,14 @@ export async function renderRecapEmail(
     <p style="margin:0 0 12px;">
       <a href="${SITE_URL}/journal" style="display:inline-block;border:1px solid #a58a54;color:#a58a54;font-size:11px;letter-spacing:0.3em;text-transform:uppercase;padding:14px 28px;text-decoration:none;">Open your journal →</a>
     </p>
+    <p style="margin:24px 0 12px;">
+      <a href="${reviewSubmitUrl}" style="display:inline-block;border:1px solid #a58a54;color:#a58a54;font-size:11px;letter-spacing:0.3em;text-transform:uppercase;padding:14px 28px;text-decoration:none;">Share your experience →</a>
+    </p>
+    <p style="font-size:13px;line-height:1.8;color:#9a9a9a;font-weight:300;margin:8px 0;">
+      If a pattern was named in the session, name it back in your own words. Your booking reference is pre-filled — your testimonial is marked as a <strong style="color:#a58a54;">Verified Session</strong> and skips moderation.
+    </p>
     <p style="font-size:14px;line-height:1.8;color:#9a9a9a;font-weight:300;margin:16px 0 8px;">
-      <a href="${SITE_URL}/#booking" style="color:#a58a54;text-decoration:underline;">Book a follow-up</a> &nbsp;·&nbsp;
-      <a href="${SITE_URL}/testimonials/submit" style="color:#a58a54;text-decoration:underline;">Rate your session</a>
+      <a href="${SITE_URL}/#booking" style="color:#a58a54;text-decoration:underline;">Book a follow-up</a>
     </p>
   `;
 

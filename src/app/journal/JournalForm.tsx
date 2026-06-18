@@ -65,12 +65,20 @@ interface JournalFormProps {
   defaultDate?: string;
   /** Called after a successful save with the saved entry. */
   onSaved?: (entry: JournalEntryDTO) => void;
+  /**
+   * Optional seed text for the note field — used when the user clicks
+   * "Write in journal" from the daily check-in. Only applied when there
+   * is no initialEntry (i.e. the form is in create mode). The parent
+   * bumps the form's key to force a fresh mount when this changes.
+   */
+  noteSeed?: string | null;
 }
 
 export default function JournalForm({
   initialEntry,
   defaultDate,
   onSaved,
+  noteSeed,
 }: JournalFormProps) {
   const [csrfToken, setCsrfToken] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -94,7 +102,9 @@ export default function JournalForm({
       energy: initialEntry?.energy ?? 3,
       trigger: initialEntry?.trigger ?? "",
       pattern: initialEntry?.pattern ?? "none",
-      note: initialEntry?.note ?? "",
+      // If we're in create mode and a noteSeed was passed (from the
+      // daily check-in's journal prompt), use it as the initial note.
+      note: initialEntry?.note ?? noteSeed ?? "",
     },
   });
 

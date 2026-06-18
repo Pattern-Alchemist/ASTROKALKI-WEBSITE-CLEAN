@@ -160,9 +160,14 @@ export async function middleware(request: NextRequest) {
       pathname.startsWith('/api/ai/chart') ||
       pathname.startsWith('/api/ai/voice-reading') ||
       pathname.startsWith('/api/ai/portrait') ||
+      pathname.startsWith('/api/ai/draft') ||
+      pathname.startsWith('/api/ai/social-image') ||
       pathname.startsWith('/api/journal') ||
       pathname.startsWith('/api/email-course') ||
-      pathname.startsWith('/api/tts'));
+      pathname.startsWith('/api/tts') ||
+      pathname.startsWith('/api/birth-chart') ||
+      pathname.startsWith('/api/experiment') ||
+      pathname.startsWith('/api/reviews'));
 
   // Paths that bypass all public-POST guards (verified via signature instead)
   const isSignatureVerifiedPost =

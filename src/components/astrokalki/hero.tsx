@@ -5,6 +5,7 @@ import { motion, useScroll, useTransform } from "framer-motion";
 import Image from "next/image";
 import { useI18n } from "@/lib/i18n-context";
 import { AvailabilityIndicator } from "@/components/astrokalki/availability-indicator";
+import { AbVariant } from "@/components/astrokalki/ab-variant";
 
 /* ── Tiny (16x10) dark cinematic LQIP — base64-encoded PNG.
  *   Matches the hero's #050505 base with a faint warm-amber undertone
@@ -13,6 +14,52 @@ import { AvailabilityIndicator } from "@/components/astrokalki/availability-indi
  *   streams in via next/image. ── */
 const HERO_BLUR_PLACEHOLDER =
   "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAKCAIAAAAy3EnLAAAAH0lEQVR42mMUFWRlIAWw/PvHMKqBsAYGGmtgIlE9AwAoQA4zPSharQAAAABJRU5ErkJggg==";
+
+/* ── Three-line cinematic headline. Extracted so the A/B test wrapper
+ *   can swap in alternative copy without duplicating the animation
+ *   classes / framer-motion variants. The visual structure (3 spans,
+ *   staggered fade-up, gold italic third line) is identical across
+ *   variants — only the copy changes. ── */
+function Headline({
+  show,
+  line1,
+  line2,
+  line3,
+}: {
+  show: boolean;
+  line1: string;
+  line2: string;
+  line3: string;
+}) {
+  return (
+    <h1 className="text-[#f0eee9] text-[clamp(2.75rem,8vw,7rem)] leading-[0.98] tracking-[-0.025em] font-serif">
+      <motion.span
+        initial={{ opacity: 0, y: 28 }}
+        animate={{ opacity: show ? 1 : 0, y: show ? 0 : 28 }}
+        transition={{ duration: 1.1, delay: 0.3, ease: [0.25, 0.46, 0.45, 0.94] }}
+        className="block"
+      >
+        {line1}
+      </motion.span>
+      <motion.span
+        initial={{ opacity: 0, y: 28 }}
+        animate={{ opacity: show ? 1 : 0, y: show ? 0 : 28 }}
+        transition={{ duration: 1.1, delay: 0.55, ease: [0.25, 0.46, 0.45, 0.94] }}
+        className="block text-[#7a7a7a]"
+      >
+        {line2}
+      </motion.span>
+      <motion.span
+        initial={{ opacity: 0, y: 28 }}
+        animate={{ opacity: show ? 1 : 0, y: show ? 0 : 28 }}
+        transition={{ duration: 1.1, delay: 0.8, ease: [0.25, 0.46, 0.45, 0.94] }}
+        className="block text-[#c9a96e] italic font-light"
+      >
+        {line3}
+      </motion.span>
+    </h1>
+  );
+}
 
 /* ─── FINAL HERO — typography-first. Movie-poster composition.
  *   One dominant image. One dominant headline. One CTA. Nothing else.
@@ -78,33 +125,37 @@ export default function Hero() {
       >
         <div className="w-full px-6 sm:px-10 lg:px-16 xl:px-24">
           <div className="max-w-2xl">
-            {/* ── Dominant headline — three lines, one statement ── */}
-            <h1 className="text-[#f0eee9] text-[clamp(2.75rem,8vw,7rem)] leading-[0.98] tracking-[-0.025em] font-serif">
-              <motion.span
-                initial={{ opacity: 0, y: 28 }}
-                animate={{ opacity: showHeadline ? 1 : 0, y: showHeadline ? 0 : 28 }}
-                transition={{ duration: 1.1, delay: 0.3, ease: [0.25, 0.46, 0.45, 0.94] }}
-                className="block"
-              >
-                {t("hero.headline1")}
-              </motion.span>
-              <motion.span
-                initial={{ opacity: 0, y: 28 }}
-                animate={{ opacity: showHeadline ? 1 : 0, y: showHeadline ? 0 : 28 }}
-                transition={{ duration: 1.1, delay: 0.55, ease: [0.25, 0.46, 0.45, 0.94] }}
-                className="block text-[#7a7a7a]"
-              >
-                {t("hero.headline2")}
-              </motion.span>
-              <motion.span
-                initial={{ opacity: 0, y: 28 }}
-                animate={{ opacity: showHeadline ? 1 : 0, y: showHeadline ? 0 : 28 }}
-                transition={{ duration: 1.1, delay: 0.8, ease: [0.25, 0.46, 0.45, 0.94] }}
-                className="block text-[#c9a96e] italic font-light"
-              >
-                {t("hero.headline3")}
-              </motion.span>
-            </h1>
+            {/* ── Dominant headline — three lines, one statement ──
+             *    Wrapped in <AbVariant> for the "hero-headline" A/B test.
+             *    Default (control) uses the canonical i18n copy. Variant
+             *    "b" swaps line 2 from "Different Face." to "Same Story."
+             *    — a hammer-rhythm variant that repeats the word "Same"
+             *    across all three beats to test whether the emphatic
+             *    repetition drives more scroll-throughs than the
+             *    alternating same/different cadence. The visual
+             *    structure (3 spans, staggered fade-up, gold italic
+             *    third line) is identical across variants. */}
+            <AbVariant
+              experimentName="hero-headline"
+              default={
+                <Headline
+                  show={showHeadline}
+                  line1={t("hero.headline1")}
+                  line2={t("hero.headline2")}
+                  line3={t("hero.headline3")}
+                />
+              }
+              variants={{
+                b: (
+                  <Headline
+                    show={showHeadline}
+                    line1="Same Pain."
+                    line2="Same Story."
+                    line3="Same Pattern."
+                  />
+                ),
+              }}
+            />
 
             {/* ── Supporting text — three short lines. Never longer. ── */}
             <motion.div

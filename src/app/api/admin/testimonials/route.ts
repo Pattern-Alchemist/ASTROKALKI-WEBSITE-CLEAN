@@ -83,8 +83,34 @@ export async function GET(request: NextRequest) {
       db.testimonial.count({ where }),
     ]);
 
+    // ─── Fetch VerifiedReview rows for these testimonials in one query ──
+    // There's no Prisma @relation between Testimonial and VerifiedReview,
+    // so we resolve the link here and attach a `verified` boolean (plus
+    // the linked bookingId + verifiedAt for the admin UI to display).
+    // Empty `in: []` would crash Prisma, so guard with .length.
+    const ids = testimonials.map((t) => t.id);
+    const verifiedReviews = ids.length
+      ? await db.verifiedReview.findMany({
+          where: { testimonialId: { in: ids } },
+          select: { testimonialId: true, bookingId: true, verifiedAt: true },
+        })
+      : [];
+    const verifiedByTestimonial = new Map(
+      verifiedReviews.map((v) => [v.testimonialId, v])
+    );
+
+    const withVerified = testimonials.map((t) => {
+      const v = verifiedByTestimonial.get(t.id);
+      return {
+        ...t,
+        verified: Boolean(v),
+        verifiedBookingId: v?.bookingId ?? null,
+        verifiedAt: v?.verifiedAt ?? null,
+      };
+    });
+
     return NextResponse.json({
-      testimonials,
+      testimonials: withVerified,
       pagination: {
         page,
         limit,

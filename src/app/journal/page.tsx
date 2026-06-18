@@ -5,6 +5,13 @@ import { authOptions } from "@/lib/auth";
 import { db } from "@/lib/db";
 import JournalApp from "./JournalApp";
 import type { JournalEntryDTO, Mood } from "./types";
+import type { CheckInResult } from "./JournalCheckIn";
+import type { TransitData } from "@/lib/astrology/transits";
+import type { PatternActivation } from "@/lib/astrology/pattern-activation";
+import {
+  extractJournalPrompt,
+  stripPromptLine,
+} from "@/lib/ai/transit-prompt";
 
 /**
  * /journal — the Pattern Journal.
@@ -14,6 +21,10 @@ import type { JournalEntryDTO, Mood } from "./types";
  * user's last 30 days of journal entries and passes them to the JournalApp
  * client component, which owns the live state (selected entry, refresh
  * after save, etc).
+ *
+ * Also pre-fetches the user's most recent UserTransit check-in from
+ * today (if any) so the daily check-in section renders populated on
+ * first paint — no client-side fetch needed for the common case.
  *
  * The journal is a daily-use tool — the design is intentionally calm,
  * spacious, and editorial, matching the rest of the AstroKalki dark theme.
@@ -57,16 +68,30 @@ export default async function JournalPage() {
   // round-trip — this is the same pattern the /account page uses for its
   // membership/bookings data.
   const from = new Date(Date.now() - THIRTY_DAYS_MS);
-  const rows = await db.journalEntry
-    .findMany({
-      where: {
-        email,
-        date: { gte: from },
-      },
-      orderBy: { date: "desc" },
-      take: 500,
-    })
-    .catch(() => []);
+  const [rows, latestCheckInRow] = await Promise.all([
+    db.journalEntry
+      .findMany({
+        where: {
+          email,
+          date: { gte: from },
+        },
+        orderBy: { date: "desc" },
+        take: 500,
+      })
+      .catch(() => []),
+    // ─── Latest UserTransit check-in for today (if any) ────────────────
+    // Pre-fetches the member's most recent check-in. If it's from today
+    // (UTC), we pass it to JournalApp as `initialCheckIn` so the daily
+    // check-in section renders populated on first paint. Older check-ins
+    // are ignored — the rate limit only allows one per day, so the user
+    // can re-run if their last one is from yesterday.
+    db.userTransit
+      .findFirst({
+        where: { email },
+        orderBy: { createdAt: "desc" },
+      })
+      .catch(() => null),
+  ]);
 
   const entries: JournalEntryDTO[] = rows.map((r) => ({
     id: r.id,
@@ -81,7 +106,51 @@ export default async function JournalPage() {
     createdAt: r.createdAt.toISOString(),
   }));
 
+  // ─── Resolve today's check-in (if from today UTC) ─────────────────────
+  let initialCheckIn: CheckInResult | null = null;
+  if (latestCheckInRow) {
+    const checkInDate = new Date(latestCheckInRow.createdAt);
+    const todayUtc = new Date();
+    const sameUtcDay =
+      checkInDate.getUTCFullYear() === todayUtc.getUTCFullYear() &&
+      checkInDate.getUTCMonth() === todayUtc.getUTCMonth() &&
+      checkInDate.getUTCDate() === todayUtc.getUTCDate();
+    if (sameUtcDay) {
+      try {
+        const transits = JSON.parse(
+          latestCheckInRow.transitData,
+        ) as TransitData;
+        const activations = JSON.parse(
+          latestCheckInRow.patternActivation ?? "[]",
+        ) as PatternActivation[];
+        const rawInsight = latestCheckInRow.insight ?? "";
+        const journalPrompt = extractJournalPrompt(rawInsight) ?? "";
+        const insightBody = stripPromptLine(rawInsight);
+        if (transits?.planets?.Sun?.signName) {
+          initialCheckIn = {
+            transits,
+            patternActivations: activations,
+            insight: insightBody,
+            journalPrompt,
+            // We can't know from the DB alone whether the user had a
+            // birth chart at check-in time. Default to true; the UI
+            // uses this only for a small caption.
+            hasNatalChart: true,
+          };
+        }
+      } catch {
+        // Malformed JSON in DB — silently drop, the user can re-run.
+        initialCheckIn = null;
+      }
+    }
+  }
+
   return (
-    <JournalApp initialEntries={entries} email={email} name={name} />
+    <JournalApp
+      initialEntries={entries}
+      email={email}
+      name={name}
+      initialCheckIn={initialCheckIn}
+    />
   );
 }

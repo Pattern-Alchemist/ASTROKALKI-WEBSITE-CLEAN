@@ -1,0 +1,865 @@
+     1→import Link from "next/link";
+     2→import { Suspense } from "react";
+     3→import type { Metadata } from "next";
+     4→import Breadcrumbs from "@/components/astrokalki/breadcrumbs";
+     5→import SignInForm from "@/components/astrokalki/sign-in-form";
+     6→import SignOutButton from "@/components/astrokalki/sign-out-button";
+     7→import PortalLink from "@/components/astrokalki/portal-link";
+     8→import PreferencesForm from "@/components/astrokalki/preferences-form";
+     9→import AiChat from "@/components/astrokalki/ai-chat";
+    10→import RecordingsList, {
+    11→  type AccountRecording,
+    12→} from "@/app/account/RecordingsList";
+    13→import { getServerSession } from "next-auth";
+    14→import { authOptions } from "@/lib/auth";
+    15→import { db } from "@/lib/db";
+    16→import { getAtlasPattern } from "@/lib/content/patterns/atlas";
+    17→
+    18→/**
+    19→ * /account — the AstroKalki member portal.
+    20→ *
+    21→ * Two states, both server-rendered:
+    22→ *
+    23→ *   ─── Not signed in ─────────────────────────────────────────────────────
+    24→ *   Renders the magic-link sign-in form. The form POSTs to NextAuth's
+    25→ *   /api/auth/signin/email; NextAuth sends the branded magic-link email
+    26→ *   via the sendVerificationRequest configured in /src/lib/auth.ts. After
+    27→ *   the user clicks the link, they land back on /account signed in.
+    28→ *
+    29→ *   ─── Signed in ─────────────────────────────────────────────────────────
+    30→ *   Renders four panels:
+    31→ *     I.   Membership status — plan, current period end, cancel-at-period flag
+    32→ *     II.  Subscription management — Stripe Billing Portal launcher
+    33→ *     III. Session history — recent bookings tied to this email
+    34→ *     IV.  Email preferences — drip / session / blog toggles
+    35→ *
+    36→ * The page reads everything directly from the database (server component).
+    37→ * The /api/stripe/usage route exists as a client-refresh fallback for when
+    38→ * the user returns from Stripe with ?status=success or ?status=portal.
+    39→ */
+    40→
+    41→export const metadata: Metadata = {
+    42→  title: "Account — AstroKalki",
+    43→  description:
+    44→    "AstroKalki member portal — manage your membership, view your session history, and tune your email preferences.",
+    45→  alternates: { canonical: "https://astrokalki.com/account" },
+    46→  robots: { index: false, follow: false },
+    47→  openGraph: {
+    48→    title: "AstroKalki Member Portal",
+    49→    description: "Manage your membership, sessions, and email preferences.",
+    50→    type: "website",
+    51→    url: "https://astrokalki.com/account",
+    52→    siteName: "AstroKalki",
+    53→  },
+    54→};
+    55→
+    56→function formatDate(d: Date | null | undefined): string {
+    57→  if (!d) return "—";
+    58→  return d.toLocaleDateString("en-IN", {
+    59→    year: "numeric",
+    60→    month: "long",
+    61→    day: "numeric",
+    62→  });
+    63→}
+    64→
+    65→function formatDateTime(d: Date | null | undefined): string {
+    66→  if (!d) return "—";
+    67→  return d.toLocaleDateString("en-IN", {
+    68→    year: "numeric",
+    69→    month: "short",
+    70→    day: "numeric",
+    71→  });
+    72→}
+    73→
+    74→const STATUS_LABEL: Record<string, string> = {
+    75→  active: "Active",
+    76→  cancelled: "Cancelled",
+    77→  expired: "Expired",
+    78→};
+    79→
+    80→const STATUS_COLOR: Record<string, string> = {
+    81→  active: "text-[#c9a96e]",
+    82→  cancelled: "text-[#a58a54]",
+    83→  expired: "text-[#5a5a5a]",
+    84→};
+    85→
+    86→export default async function AccountPage() {
+    87→  const session = await getServerSession(authOptions).catch(() => null);
+    88→
+    89→  // ─── Not signed in ─────────────────────────────────────────────────────
+    90→  if (!session?.user?.email) {
+    91→    return (
+    92→      <main className="min-h-screen bg-[#050505] text-[#f0eee9]">
+    93→        <header className="border-b border-white/[0.04]">
+    94→          <div className="max-w-3xl mx-auto px-6 sm:px-10 py-16 sm:py-24">
+    95→            <div className="mb-8">
+    96→              <Breadcrumbs
+    97→                items={[{ label: "Home", href: "/" }, { label: "Account" }]}
+    98→              />
+    99→            </div>
+   100→            <p className="text-[10px] tracking-[0.4em] uppercase text-[#c9a96e]/70 mb-6 font-light">
+   101→              Member portal
+   102→            </p>
+   103→            <h1 className="text-4xl sm:text-5xl md:text-6xl font-serif text-[#f0eee9] font-light tracking-[-0.025em] leading-[1.05] mb-6">
+   104→              Sign in to your account.
+   105→            </h1>
+   106→            <p className="text-lg sm:text-xl text-[#9a9a9a] font-light leading-[1.7] max-w-2xl">
+   107→              Enter the email tied to your membership. We&apos;ll send a one-time sign-in link — no password to remember, no account to create. The membership, sessions, and preferences live on the other side.
+   108→            </p>
+   109→          </div>
+   110→        </header>
+   111→
+   112→        <section className="py-16 sm:py-24 px-6 sm:px-10">
+   113→          <div className="max-w-3xl mx-auto">
+   114→            <div className="border-t border-white/[0.06] pt-12">
+   115→              <SignInForm />
+   116→            </div>
+   117→
+   118→            <div className="mt-16 pt-10 border-t border-white/[0.04]">
+   119→              <p className="text-[10px] tracking-[0.4em] uppercase text-[#c9a96e]/60 mb-4 font-light">
+   120→                Not a member yet?
+   121→              </p>
+   122→              <p className="text-base text-[#cfcabf] font-light leading-[1.8] mb-6 max-w-md">
+   123→                Membership starts at ₹999/month — recurring sessions, recording archive, Pattern Atlas access, and priority booking.
+   124→              </p>
+   125→              <Link
+   126→                href="/membership"
+   127→                className="inline-flex items-center gap-3 text-[11px] tracking-[0.3em] uppercase text-[#c9a96e] border-b border-[#c9a96e]/40 pb-2 hover:border-[#c9a96e] hover:text-[#f0eee9] transition-colors"
+   128→              >
+   129→                See membership options
+   130→                <span>→</span>
+   131→              </Link>
+   132→            </div>
+   133→          </div>
+   134→        </section>
+   135→      </main>
+   136→    );
+   137→  }
+   138→
+   139→  // ─── Signed in ─────────────────────────────────────────────────────────
+   140→  const email = session.user.email;
+   141→  const userId = (session.user as { id?: string }).id;
+   142→  const name = session.user.name || email.split("@")[0];
+   143→
+   144→  // Parallel data fetch: membership + bookings + chart analyses + recordings + pattern portraits + journal entries + newsletter prefs.
+   145→  const [membership, bookings, chartAnalyses, recordings, portraits, journalAgg, newsletter] = await Promise.all([
+   146→    db.membership.findFirst({
+   147→      where: {
+   148→        OR: [
+   149→          ...(userId ? [{ userId }] : []),
+   150→          { email },
+   151→        ],
+   152→      },
+   153→      orderBy: { createdAt: "desc" },
+   154→      select: {
+   155→        plan: true,
+   156→        status: true,
+   157→        currentPeriodEnd: true,
+   158→        cancelAtPeriodEnd: true,
+   159→        createdAt: true,
+   160→        stripeCustomerId: true,
+   161→      },
+   162→    }),
+   163→    db.booking.findMany({
+   164→      where: { email },
+   165→      orderBy: { createdAt: "desc" },
+   166→      take: 12,
+   167→      select: {
+   168→        id: true,
+   169→        duration: true,
+   170→        price: true,
+   171→        status: true,
+   172→        scheduledAt: true,
+   173→        createdAt: true,
+   174→        contexts: true,
+   175→      },
+   176→    }),
+   177→    db.chartAnalysis.findMany({
+   178→      where: { email },
+   179→      orderBy: { createdAt: "desc" },
+   180→      take: 20,
+   181→      select: {
+   182→        id: true,
+   183→        imageUrl: true,
+   184→        analysis: true,
+   185→        identifiedPatterns: true,
+   186→        createdAt: true,
+   187→      },
+   188→    }),
+   189→    db.recordedReading.findMany({
+   190→      where: {
+   191→        booking: { email },
+   192→      },
+   193→      orderBy: { createdAt: "desc" },
+   194→      take: 20,
+   195→      select: {
+   196→        id: true,
+   197→        title: true,
+   198→        duration: true,
+   199→        price: true,
+   200→        createdAt: true,
+   201→        booking: {
+   202→          select: {
+   203→            name: true,
+   204→            email: true,
+   205→            scheduledAt: true,
+   206→          },
+   207→        },
+   208→      },
+   209→    }),
+   210→    db.patternPortrait.findMany({
+   211→      where: { email },
+   212→      orderBy: { createdAt: "desc" },
+   213→      take: 30,
+   214→      select: {
+   215→        id: true,
+   216→        pattern: true,
+   217→        imageUrl: true,
+   218→        createdAt: true,
+   219→      },
+   220→    }),
+   221→    // Journal aggregate — total count + most recent entry date.
+   222→    db.journalEntry
+   223→      .aggregate({
+   224→        where: { email },
+   225→        _count: { _all: true },
+   226→        _max: { date: true },
+   227→      })
+   228→      .catch(() => ({ _count: { _all: 0 }, _max: { date: null } })),
+   229→    db.newsletter.findUnique({
+   230→      where: { email },
+   231→      select: {
+   232→        prefSessions: true,
+   233→        prefBlog: true,
+   234→        prefDrip: true,
+   235→        optedOut: true,
+   236→      },
+   237→    }),
+   238→  ]).catch(() => [
+   239→    null,
+   240→    [],
+   241→    [],
+   242→    [],
+   243→    [],
+   244→    { _count: { _all: 0 }, _max: { date: null } },
+   245→    null,
+   246→  ] as const);
+   247→
+   248→  const accountRecordings: AccountRecording[] = (recordings || []).map((r) => ({
+   249→    id: r.id,
+   250→    title: r.title,
+   251→    duration: r.duration,
+   252→    price: r.price,
+   253→    createdAt: r.createdAt instanceof Date ? r.createdAt.toISOString() : r.createdAt,
+   254→    booking: r.booking
+   255→      ? {
+   256→          name: r.booking.name,
+   257→          email: r.booking.email,
+   258→          scheduledAt:
+   259→            r.booking.scheduledAt instanceof Date
+   260→              ? r.booking.scheduledAt.toISOString()
+   261→              : r.booking.scheduledAt,
+   262→        }
+   263→      : null,
+   264→  }));
+   265→
+   266→  const activeMembership = membership && membership.status === "active";
+   267→
+   268→  return (
+   269→    <main className="min-h-screen bg-[#050505] text-[#f0eee9]">
+   270→      <header className="border-b border-white/[0.04]">
+   271→        <div className="max-w-4xl mx-auto px-6 sm:px-10 py-16 sm:py-24">
+   272→          <div className="mb-8">
+   273→            <Breadcrumbs
+   274→              items={[{ label: "Home", href: "/" }, { label: "Account" }]}
+   275→            />
+   276→          </div>
+   277→          <p className="text-[10px] tracking-[0.4em] uppercase text-[#c9a96e]/70 mb-6 font-light">
+   278→            Member portal
+   279→          </p>
+   280→          <h1 className="text-4xl sm:text-5xl md:text-6xl font-serif text-[#f0eee9] font-light tracking-[-0.025em] leading-[1.05] mb-6">
+   281→            Welcome back, <span className="text-[#c9a96e] italic">{name}</span>.
+   282→          </h1>
+   283→          <p className="text-lg sm:text-xl text-[#9a9a9a] font-light leading-[1.7] max-w-2xl">
+   284→            Signed in as <span className="text-[#cfcabf]">{email}</span>. This is your private portal — membership status, subscription management, session history, and email preferences.
+   285→          </p>
+   286→          <div className="mt-8">
+   287→            <SignOutButton />
+   288→          </div>
+   289→        </div>
+   290→      </header>
+   291→
+   292→      <div className="max-w-4xl mx-auto px-6 sm:px-10 py-16 sm:py-24">
+   293→        {/* ─── Ask AstroKalki — AI assistant (member exclusive) ───────────── */}
+   294→        {/* The killer feature of the portal. Surfaced at the top so members
+   295→            see it before the account-management panels below. */}
+   296→        <section className="mb-20">
+   297→          <p className="text-[10px] tracking-[0.4em] uppercase text-[#c9a96e]/60 mb-4 font-light">
+   298→            AI Assistant · Member exclusive
+   299→          </p>
+   300→          <h2 className="text-3xl sm:text-4xl font-serif text-[#f0eee9] font-light tracking-[-0.02em] mb-4">
+   301→            Ask AstroKalki.
+   302→          </h2>
+   303→          <p className="text-base text-[#9a9a9a] font-light leading-[1.7] max-w-2xl mb-6">
+   304→            An AI trained on the 10 Atlas patterns and 25 essays — available
+   305→            24/7. Ask about the loops you can&apos;t break, the partners who
+   306→            keep returning, the feelings that have no name. The voice is
+   307→            direct, second-person, no mystical jargon. Not prediction.
+   308→            Pattern recognition.
+   309→          </p>
+   310→          <div className="mb-6">
+   311→            <Link
+   312→              href="/ask-astrokalki"
+   313→              className="inline-flex items-center gap-3 text-[11px] tracking-[0.3em] uppercase text-[#c9a96e] border-b border-[#c9a96e]/40 pb-2 hover:border-[#c9a96e] hover:text-[#f0eee9] transition-colors"
+   314→            >
+   315→              Open full chat experience
+   316→              <span>→</span>
+   317→            </Link>
+   318→          </div>
+   319→          {/* Suspense boundary required because AiChat uses useSearchParams
+   320→              (Next.js 16 static-render guard). */}
+   321→          <Suspense
+   322→            fallback={
+   323→              <div className="bg-[#0a0a0a] border border-white/[0.06] rounded-lg h-[640px] flex items-center justify-center">
+   324→                <p className="text-[11px] text-[#5a5a5a] font-light tracking-wide">
+   325→                  Loading chat…
+   326→                </p>
+   327→              </div>
+   328→            }
+   329→          >
+   330→            <AiChat
+   331→              isAuthenticated
+   332→              email={email}
+   333→              variant="embedded"
+   334→            />
+   335→          </Suspense>
+   336→        </section>
+   337→
+   338→        {/* ─── I. Membership status ─────────────────────────────────────── */}
+   339→        <section className="mb-20">
+   340→          <p className="text-[10px] tracking-[0.4em] uppercase text-[#c9a96e]/60 mb-4 font-light">
+   341→            <span className="font-mono mr-3">I.</span>
+   342→            Membership
+   343→          </p>
+   344→          <h2 className="text-3xl sm:text-4xl font-serif text-[#f0eee9] font-light tracking-[-0.02em] mb-8">
+   345→            Your current status.
+   346→          </h2>
+   347→
+   348→          {membership ? (
+   349→            <div className="border-t border-white/[0.06]">
+   350→              <div className="grid grid-cols-1 sm:grid-cols-2 gap-8 py-8 border-b border-white/[0.06]">
+   351→                <div>
+   352→                  <p className="text-[10px] tracking-[0.3em] uppercase text-[#5a5a5a] mb-2 font-light">
+   353→                    Plan
+   354→                  </p>
+   355→                  <p className="text-xl font-serif text-[#f0eee9] font-light capitalize">
+   356→                    {membership.plan}
+   357→                  </p>
+   358→                </div>
+   359→                <div>
+   360→                  <p className="text-[10px] tracking-[0.3em] uppercase text-[#5a5a5a] mb-2 font-light">
+   361→                    Status
+   362→                  </p>
+   363→                  <p
+   364→                    className={`text-xl font-serif font-light ${STATUS_COLOR[membership.status] || "text-[#9a9a9a]"}`}
+   365→                  >
+   366→                    {STATUS_LABEL[membership.status] || membership.status}
+   367→                  </p>
+   368→                </div>
+   369→                <div>
+   370→                  <p className="text-[10px] tracking-[0.3em] uppercase text-[#5a5a5a] mb-2 font-light">
+   371→                    {membership.cancelAtPeriodEnd ? "Cancels at" : "Renews on"}
+   372→                  </p>
+   373→                  <p className="text-base text-[#cfcabf] font-light">
+   374→                    {formatDate(membership.currentPeriodEnd)}
+   375→                  </p>
+   376→                </div>
+   377→                <div>
+   378→                  <p className="text-[10px] tracking-[0.3em] uppercase text-[#5a5a5a] mb-2 font-light">
+   379→                    Member since
+   380→                  </p>
+   381→                  <p className="text-base text-[#cfcabf] font-light">
+   382→                    {formatDate(membership.createdAt)}
+   383→                  </p>
+   384→                </div>
+   385→              </div>
+   386→
+   387→              {membership.cancelAtPeriodEnd && (
+   388→                <p className="py-6 text-sm text-[#a58a54]/80 font-light leading-[1.7] border-b border-white/[0.06]">
+   389→                  Your membership is set to cancel at the end of the current period. You&apos;ll keep access until {formatDate(membership.currentPeriodEnd)}, after which it will expire. You can reverse this from the billing portal below.
+   390→                </p>
+   391→              )}
+   392→
+   393→              {!activeMembership && (
+   394→                <div className="py-8 border-b border-white/[0.06]">
+   395→                  <p className="text-base text-[#cfcabf] font-light leading-[1.8] mb-6">
+   396→                    Your membership is no longer active. You can re-subscribe at any time — your recording archive and Atlas access remain available.
+   397→                  </p>
+   398→                  <Link
+   399→                    href="/membership"
+   400→                    className="inline-flex items-center gap-3 text-[11px] tracking-[0.3em] uppercase text-[#c9a96e] border-b border-[#c9a96e]/40 pb-2 hover:border-[#c9a96e] hover:text-[#f0eee9] transition-colors"
+   401→                  >
+   402→                    Re-subscribe
+   403→                    <span>→</span>
+   404→                  </Link>
+   405→                </div>
+   406→              )}
+   407→            </div>
+   408→          ) : (
+   409→            <div className="border-t border-white/[0.06] py-8 border-b border-white/[0.06]">
+   410→              <p className="text-base text-[#cfcabf] font-light leading-[1.8] mb-6 max-w-2xl">
+   411→                You don&apos;t have a membership yet. Membership unlocks recurring sessions, the recording archive, Pattern Atlas access, and priority booking.
+   412→              </p>
+   413→              <Link
+   414→                href="/membership"
+   415→                className="inline-flex items-center gap-3 text-[11px] tracking-[0.3em] uppercase text-[#c9a96e] border-b border-[#c9a96e]/40 pb-2 hover:border-[#c9a96e] hover:text-[#f0eee9] transition-colors"
+   416→              >
+   417→                Become a member
+   418→                <span>→</span>
+   419→              </Link>
+   420→            </div>
+   421→          )}
+   422→        </section>
+   423→
+   424→        {/* ─── II. Subscription management ──────────────────────────────── */}
+   425→        {activeMembership && (
+   426→          <section className="mb-20">
+   427→            <p className="text-[10px] tracking-[0.4em] uppercase text-[#c9a96e]/60 mb-4 font-light">
+   428→              <span className="font-mono mr-3">II.</span>
+   429→              Subscription
+   430→            </p>
+   431→            <h2 className="text-3xl sm:text-4xl font-serif text-[#f0eee9] font-light tracking-[-0.02em] mb-4">
+   432→              Manage your subscription.
+   433→            </h2>
+   434→            <p className="text-base text-[#9a9a9a] font-light leading-[1.7] max-w-2xl mb-8">
+   435→              Update your payment method, change plans, switch between monthly and annual, or cancel — all through the secure Stripe billing portal. You&apos;ll return to this page when you&apos;re done.
+   436→            </p>
+   437→            <PortalLink />
+   438→          </section>
+   439→        )}
+   440→
+   441→        {/* ─── III. Session history ─────────────────────────────────────── */}
+   442→        <section className="mb-20">
+   443→          <p className="text-[10px] tracking-[0.4em] uppercase text-[#c9a96e]/60 mb-4 font-light">
+   444→            <span className="font-mono mr-3">{activeMembership ? "III." : "II."}</span>
+   445→            Session history
+   446→          </p>
+   447→          <h2 className="text-3xl sm:text-4xl font-serif text-[#f0eee9] font-light tracking-[-0.02em] mb-8">
+   448→            Your recent bookings.
+   449→          </h2>
+   450→
+   451→          {bookings && bookings.length > 0 ? (
+   452→            <div className="border-t border-white/[0.06]">
+   453→              {bookings.map((booking, idx) => {
+   454→                let contexts: string[] = [];
+   455→                try {
+   456→                  const parsed = JSON.parse(booking.contexts);
+   457→                  if (Array.isArray(parsed)) contexts = parsed;
+   458→                } catch {
+   459→                  // ignore — contexts stays []
+   460→                }
+   461→                return (
+   462→                  <div
+   463→                    key={booking.id}
+   464→                    className="py-6 border-b border-white/[0.06] grid grid-cols-1 sm:grid-cols-12 gap-4"
+   465→                  >
+   466→                    <div className="sm:col-span-1">
+   467→                      <span className="text-[11px] tracking-[0.2em] text-[#c9a96e]/40 font-mono">
+   468→                        {String(idx + 1).padStart(2, "0")}
+   469→                      </span>
+   470→                    </div>
+   471→                    <div className="sm:col-span-5">
+   472→                      <p className="text-base text-[#f0eee9] font-serif font-light mb-1">
+   473→                        {booking.duration} minutes
+   474→                      </p>
+   475→                      <p className="text-xs text-[#7a7a7a] font-light tracking-wide">
+   476→                        Booked on {formatDateTime(booking.createdAt)}
+   477→                        {booking.scheduledAt
+   478→                          ? ` · Scheduled for ${formatDateTime(booking.scheduledAt)}`
+   479→                          : ""}
+   480→                      </p>
+   481→                    </div>
+   482→                    <div className="sm:col-span-3">
+   483→                      <p className="text-[10px] tracking-[0.25em] uppercase text-[#5a5a5a] mb-1 font-light">
+   484→                        Status
+   485→                      </p>
+   486→                      <p className="text-sm text-[#cfcabf] font-light capitalize">
+   487→                        {booking.status}
+   488→                      </p>
+   489→                    </div>
+   490→                    <div className="sm:col-span-3">
+   491→                      <p className="text-[10px] tracking-[0.25em] uppercase text-[#5a5a5a] mb-1 font-light">
+   492→                        Investment
+   493→                      </p>
+   494→                      <p className="text-sm text-[#c9a96e] font-light">
+   495→                        {booking.price}
+   496→                      </p>
+   497→                    </div>
+   498→                    {contexts.length > 0 && (
+   499→                      <div className="sm:col-span-11 sm:col-start-2 mt-2">
+   500→                        <p className="text-[10px] tracking-[0.25em] uppercase text-[#5a5a5a] mb-2 font-light">
+   501→                          Focus areas
+   502→                        </p>
+   503→                        <div className="flex flex-wrap gap-2">
+   504→                          {contexts.map((c) => (
+   505→                            <span
+   506→                              key={c}
+   507→                              className="text-[11px] text-[#7a7a7a] border border-white/[0.06] px-3 py-1 font-light"
+   508→                            >
+   509→                              {c}
+   510→                            </span>
+   511→                          ))}
+   512→                        </div>
+   513→                      </div>
+   514→                    )}
+   515→                  </div>
+   516→                );
+   517→              })}
+   518→            </div>
+   519→          ) : (
+   520→            <div className="border-t border-white/[0.06] py-10 border-b border-white/[0.06]">
+   521→              <p className="text-base text-[#9a9a9a] font-light leading-[1.8] mb-6 max-w-md">
+   522→                No sessions booked yet under this email. When you book your first session, it&apos;ll appear here.
+   523→              </p>
+   524→              <Link
+   525→                href="/#booking"
+   526→                className="inline-flex items-center gap-3 text-[11px] tracking-[0.3em] uppercase text-[#c9a96e] border-b border-[#c9a96e]/40 pb-2 hover:border-[#c9a96e] hover:text-[#f0eee9] transition-colors"
+   527→              >
+   528→                Book a session
+   529→                <span>→</span>
+   530→              </Link>
+   531→            </div>
+   532→          )}
+   533→        </section>
+   534→
+   535→        {/* ─── Chart analyses (VLM-powered birth chart readings) ───────── */}
+   536→        {/* Placed between session history and recordings so members see the
+   537→            pattern-recognition work they've done before the session audio.
+   538→            Roman numeral is dynamic based on whether the subscription
+   539→            management section (active members only) is shown. */}
+   540→        <section className="mb-20">
+   541→          <p className="text-[10px] tracking-[0.4em] uppercase text-[#c9a96e]/60 mb-4 font-light">
+   542→            <span className="font-mono mr-3">{activeMembership ? "IV." : "III."}</span>
+   543→            Chart analyses
+   544→          </p>
+   545→          <h2 className="text-3xl sm:text-4xl font-serif text-[#f0eee9] font-light tracking-[-0.02em] mb-4">
+   546→            Your pattern-recognition readings.
+   547→          </h2>
+   548→          <p className="text-base text-[#9a9a9a] font-light leading-[1.7] max-w-2xl mb-8">
+   549→            Every chart you upload to the chart-reading tool is archived here.
+   550→            The model&apos;s analysis and the identified Atlas patterns stay
+   551→            with your account so you can revisit them — and track how your
+   552→            patterns shift over time.
+   553→          </p>
+   554→
+   555→          {chartAnalyses && chartAnalyses.length > 0 ? (
+   556→            <div className="border-t border-white/[0.06]">
+   557→              {chartAnalyses.map((analysis, idx) => {
+   558→                let identifiedPatterns: string[] = [];
+   559→                try {
+   560→                  const parsed = JSON.parse(analysis.identifiedPatterns);
+   561→                  if (Array.isArray(parsed)) {
+   562→                    identifiedPatterns = parsed.filter(
+   563→                      (s): s is string => typeof s === "string"
+   564→                    );
+   565→                  }
+   566→                } catch {
+   567→                  // Malformed JSON in DB — leave empty.
+   568→                }
+   569→                return (
+   570→                  <div
+   571→                    key={analysis.id}
+   572→                    className="py-6 border-b border-white/[0.06] grid grid-cols-1 sm:grid-cols-12 gap-4"
+   573→                  >
+   574→                    <div className="sm:col-span-1">
+   575→                      <span className="text-[11px] tracking-[0.2em] text-[#c9a96e]/40 font-mono">
+   576→                        {String(idx + 1).padStart(2, "0")}
+   577→                      </span>
+   578→                    </div>
+   579→                    <div className="sm:col-span-7">
+   580→                      <p className="text-xs text-[#7a7a7a] font-light tracking-wide mb-2">
+   581→                        {formatDateTime(analysis.createdAt)}
+   582→                      </p>
+   583→                      <p
+   584→                        className="text-sm text-[#cfcabf] font-light leading-[1.8] line-clamp-3"
+   585→                        style={{ fontFamily: '"Playfair Display", Georgia, serif' }}
+   586→                      >
+   587→                        {analysis.analysis}
+   588→                      </p>
+   589→                    </div>
+   590→                    <div className="sm:col-span-4">
+   591→                      <p className="text-[10px] tracking-[0.25em] uppercase text-[#5a5a5a] mb-2 font-light">
+   592→                        Patterns
+   593→                      </p>
+   594→                      {identifiedPatterns.length > 0 ? (
+   595→                        <div className="flex flex-wrap gap-2">
+   596→                          {identifiedPatterns.map((slug) => (
+   597→                            <Link
+   598→                              key={slug}
+   599→                              href={`/patterns/atlas/${slug}`}
+   600→                              className="text-[10px] text-[#c9a96e] border border-[#c9a96e]/30 hover:bg-[#c9a96e]/10 px-3 py-1 font-light rounded-full uppercase tracking-[0.15em] transition-colors"
+   601→                              style={{ fontFamily: '"Cinzel", Georgia, serif' }}
+   602→                            >
+   603→                              {slug
+   604→                                .replace(/^the-/, "")
+   605→                                .replace(/-/g, " ")}
+   606→                            </Link>
+   607→                          ))}
+   608→                        </div>
+   609→                      ) : (
+   610→                        <p className="text-xs text-[#5a5a5a] font-light italic">
+   611→                          No patterns identified
+   612→                        </p>
+   613→                      )}
+   614→                    </div>
+   615→                  </div>
+   616→                );
+   617→              })}
+   618→            </div>
+   619→          ) : (
+   620→            <div className="border-t border-white/[0.06] py-10 border-b border-white/[0.06]">
+   621→              <p className="text-base text-[#9a9a9a] font-light leading-[1.8] mb-6 max-w-md">
+   622→                No chart analyses yet. Upload a birth chart image to get a
+   623→                pattern-recognition reading from the model.
+   624→              </p>
+   625→              <Link
+   626→                href="/chart-reading"
+   627→                className="inline-flex items-center gap-3 text-[11px] tracking-[0.3em] uppercase text-[#c9a96e] border-b border-[#c9a96e]/40 pb-2 hover:border-[#c9a96e] hover:text-[#f0eee9] transition-colors"
+   628→              >
+   629→                Upload your chart
+   630→                <span>→</span>
+   631→              </Link>
+   632→            </div>
+   633→          )}
+   634→        </section>
+   635→
+   636→        {/* ─── "Your recordings" section ────────────────────────────────── */}
+   637→        {/* Placed between chart analyses and email preferences so members
+   638→            who have completed a session can find the audio right after the
+   639→            booking record. Roman numeral is dynamic based on whether the
+   640→            subscription-management section (active members only) is shown. */}
+   641→        <section className="mb-20">
+   642→          <p className="text-[10px] tracking-[0.4em] uppercase text-[#c9a96e]/60 mb-4 font-light">
+   643→            <span className="font-mono mr-3">{activeMembership ? "V." : "IV."}</span>
+   644→            Your recordings
+   645→          </p>
+   646→          <h2 className="text-3xl sm:text-4xl font-serif text-[#f0eee9] font-light tracking-[-0.02em] mb-4">
+   647→            Session audio, when it&apos;s ready.
+   648→          </h2>
+   649→          <p className="text-base text-[#9a9a9a] font-light leading-[1.7] max-w-2xl mb-8">
+   650→            Recorded sessions attached to your bookings appear here. Playback
+   651→            is gated by a signed link issued to your email — only you can
+   652→            stream them. Tokens expire after 24 hours; click play again to
+   653→            refresh access.
+   654→          </p>
+   655→
+   656→          <RecordingsList recordings={accountRecordings} memberEmail={email} />
+   657→        </section>
+   658→
+   659→        {/* ─── Pattern portraits ─────────────────────────────────────────── */}
+   660→        {/* AI-generated visuals the user created from a micro-reading or
+   661→            quiz result. Each portrait is keyed by their email + the Atlas
+   662→            pattern slug. Renders as an editorial gallery — image is the
+   663→            hero, pattern name + date as caption, click-through to the
+   664→            pattern page. */}
+   665→        <section className="mb-20">
+   666→          <p className="text-[10px] tracking-[0.4em] uppercase text-[#c9a96e]/60 mb-4 font-light">
+   667→            <span className="font-mono mr-3">{activeMembership ? "VI." : "V."}</span>
+   668→            Pattern portraits
+   669→          </p>
+   670→          <h2 className="text-3xl sm:text-4xl font-serif text-[#f0eee9] font-light tracking-[-0.02em] mb-4">
+   671→            The visuals you&apos;ve generated.
+   672→          </h2>
+   673→          <p className="text-base text-[#9a9a9a] font-light leading-[1.7] max-w-2xl mb-8">
+   674→            One-of-a-kind AI portraits created from your pattern results — abstract, cinematic, yours. Click any portrait to revisit the pattern it came from.
+   675→          </p>
+   676→
+   677→          {portraits && portraits.length > 0 ? (
+   678→            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-6">
+   679→              {portraits.map((p) => {
+   680→                const atlasPattern = getAtlasPattern(p.pattern);
+   681→                const created =
+   682→                  p.createdAt instanceof Date ? p.createdAt : new Date(p.createdAt);
+   683→                return (
+   684→                  <Link
+   685→                    key={p.id}
+   686→                    href={
+   687→                      atlasPattern
+   688→                        ? `/patterns/atlas/${atlasPattern.slug}`
+   689→                        : "/patterns/atlas"
+   690→                    }
+   691→                    className="group block border border-[#c9a96e]/20 p-2 bg-[#0a0a0a] hover:border-[#c9a96e]/40 transition-colors duration-300"
+   692→                  >
+   693→                    <div className="relative aspect-square overflow-hidden bg-[#050505]">
+   694→                      <img
+   695→                        src={p.imageUrl}
+   696→                        alt={`AI pattern portrait for ${atlasPattern?.name ?? p.pattern}`}
+   697→                        className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-[1.03]"
+   698→                        loading="lazy"
+   699→                      />
+   700→                      <div className="pointer-events-none absolute inset-0 ring-1 ring-inset ring-[#c9a96e]/10" />
+   701→                    </div>
+   702→                    <p
+   703→                      className="text-[10px] tracking-[0.25em] uppercase text-[#c9a96e] mt-3 mb-1 font-light"
+   704→                      style={{ fontFamily: "var(--font-cinzel)" }}
+   705→                    >
+   706→                      {atlasPattern?.name?.replace(" Pattern", "") ?? "Pattern"}
+   707→                    </p>
+   708→                    <p className="text-[10px] tracking-wide text-[#5a5a5a] font-mono">
+   709→                      {created.toLocaleDateString("en-IN", {
+   710→                        year: "numeric",
+   711→                        month: "short",
+   712→                        day: "numeric",
+   713→                      })}
+   714→                    </p>
+   715→                  </Link>
+   716→                );
+   717→              })}
+   718→            </div>
+   719→          ) : (
+   720→            <div className="border-t border-white/[0.06] py-10 border-b border-white/[0.06]">
+   721→              <p className="text-base text-[#9a9a9a] font-light leading-[1.8] mb-6 max-w-md">
+   722→                No pattern portraits yet. Take the micro-reading or the Atlas quiz, then generate a one-of-a-kind visual of your pattern.
+   723→              </p>
+   724→              <div className="flex flex-wrap gap-6">
+   725→                <Link
+   726→                  href="/#micro-reading"
+   727→                  className="inline-flex items-center gap-3 text-[11px] tracking-[0.3em] uppercase text-[#c9a96e] border-b border-[#c9a96e]/40 pb-2 hover:border-[#c9a96e] hover:text-[#f0eee9] transition-colors"
+   728→                >
+   729→                  Take the micro-reading
+   730→                  <span>→</span>
+   731→                </Link>
+   732→                <Link
+   733→                  href="/patterns/atlas/quiz"
+   734→                  className="inline-flex items-center gap-3 text-[11px] tracking-[0.3em] uppercase text-[#7a7a7a] border-b border-white/[0.08] pb-2 hover:border-[#c9a96e]/40 hover:text-[#c9a96e] transition-colors"
+   735→                >
+   736→                  Take the Atlas quiz
+   737→                  <span>→</span>
+   738→                </Link>
+   739→              </div>
+   740→            </div>
+   741→          )}
+   742→        </section>
+   743→
+   744→        {/* ─── Pattern Journal ────────────────────────────────────────────── */}
+   745→        {/* A daily emotional weather log — members log mood, energy, trigger,
+   746→            and pattern daily; weekly, the LLM synthesises what surfaced.
+   747→            Surfaces here as a teaser card with the entry count + last-log
+   748→            date, linking to /journal for the full experience. */}
+   749→        <section className="mb-20">
+   750→          <p className="text-[10px] tracking-[0.4em] uppercase text-[#c9a96e]/60 mb-4 font-light">
+   751→            <span className="font-mono mr-3">{activeMembership ? "VII." : "VI."}</span>
+   752→            Pattern Journal
+   753→          </p>
+   754→          <h2 className="text-3xl sm:text-4xl font-serif text-[#f0eee9] font-light tracking-[-0.02em] mb-4">
+   755→            The shape of your week.
+   756→          </h2>
+   757→          <p className="text-base text-[#9a9a9a] font-light leading-[1.7] max-w-2xl mb-8">
+   758→            A daily emotional weather log — five quiet minutes a day. Over
+   759→            time, the patterns you can&apos;t see in any single day surface on
+   760→            their own. Each week, the LLM reads your entries and writes back
+   761→            a synthesis in the AstroKalki voice.
+   762→          </p>
+   763→
+   764→          <div className="border-t border-white/[0.06] border-b border-white/[0.06] py-8">
+   765→            <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 sm:gap-8 mb-8">
+   766→              <div>
+   767→                <p className="text-[10px] tracking-[0.3em] uppercase text-[#5a5a5a] mb-2 font-light">
+   768→                  Total entries
+   769→                </p>
+   770→                <p className="text-2xl font-serif text-[#f0eee9] font-light font-mono">
+   771→                  {journalAgg?._count?._all ?? 0}
+   772→                </p>
+   773→              </div>
+   774→              <div>
+   775→                <p className="text-[10px] tracking-[0.3em] uppercase text-[#5a5a5a] mb-2 font-light">
+   776→                  Last logged
+   777→                </p>
+   778→                <p className="text-base text-[#cfcabf] font-light">
+   779→                  {journalAgg?._max?.date
+   780→                    ? formatDate(journalAgg._max.date)
+   781→                    : "—"}
+   782→                </p>
+   783→              </div>
+   784→              <div>
+   785→                <p className="text-[10px] tracking-[0.3em] uppercase text-[#5a5a5a] mb-2 font-light">
+   786→                  Cadence
+   787→                </p>
+   788→                <p className="text-base text-[#cfcabf] font-light">
+   789→                  Daily · 5 minutes
+   790→                </p>
+   791→              </div>
+   792→            </div>
+   793→            <Link
+   794→              href="/journal"
+   795→              className="inline-flex items-center gap-3 text-[11px] tracking-[0.3em] uppercase text-[#c9a96e] border-b border-[#c9a96e]/40 pb-2 hover:border-[#c9a96e] hover:text-[#f0eee9] transition-colors"
+   796→            >
+   797→              {(journalAgg?._count?._all ?? 0) > 0
+   798→                ? "Open your journal"
+   799→                : "Begin your journal"}
+   800→              <span>→</span>
+   801→            </Link>
+   802→          </div>
+   803→        </section>
+   804→
+   805→        {/* ─── Email preferences ────────────────────────────────────────── */}
+   806→        <section className="mb-20">
+   807→          <p className="text-[10px] tracking-[0.4em] uppercase text-[#c9a96e]/60 mb-4 font-light">
+   808→            <span className="font-mono mr-3">{activeMembership ? "VIII." : "VII."}</span>
+   809→            Email preferences
+   810→          </p>
+   811→          <h2 className="text-3xl sm:text-4xl font-serif text-[#f0eee9] font-light tracking-[-0.02em] mb-4">
+   812→            What reaches your inbox.
+   813→          </h2>
+   814→          <p className="text-base text-[#9a9a9a] font-light leading-[1.7] max-w-2xl mb-10">
+   815→            Tune which emails you receive. Session-related emails (booking confirmations, reminders) are always recommended — they&apos;re transactional, not marketing.
+   816→          </p>
+   817→
+   818→          {newsletter ? (
+   819→            <PreferencesForm
+   820→              initial={{
+   821→                prefSessions: newsletter.prefSessions,
+   822→                prefBlog: newsletter.prefBlog,
+   823→                prefDrip: newsletter.prefDrip,
+   824→              }}
+   825→            />
+   826→          ) : (
+   827→            <PreferencesForm
+   828→              initial={{
+   829→                prefSessions: true,
+   830→                prefBlog: true,
+   831→                prefDrip: true,
+   832→              }}
+   833→            />
+   834→          )}
+   835→
+   836→          {newsletter?.optedOut && (
+   837→            <p className="mt-6 text-[11px] text-[#a58a54]/80 font-light leading-relaxed">
+   838→              You previously unsubscribed from all emails. Toggling any preference above will resubscribe you to that specific category.
+   839→            </p>
+   840→          )}
+   841→        </section>
+   842→
+   843→        {/* ─── Footer of the portal ─────────────────────────────────────── */}
+   844→        <div className="pt-10 border-t border-white/[0.04] flex flex-col sm:flex-row sm:items-center sm:justify-between gap-6">
+   845→          <div>
+   846→            <p className="text-[10px] tracking-[0.3em] uppercase text-[#5a5a5a] mb-2 font-light">
+   847→              Need help?
+   848→            </p>
+   849→            <p className="text-sm text-[#9a9a9a] font-light leading-[1.7]">
+   850→              Reply to any email from us, or message us on WhatsApp — we usually reply within 24 hours.
+   851→            </p>
+   852→          </div>
+   853→          <Link
+   854→            href="/"
+   855→            className="inline-flex items-center gap-3 text-[11px] tracking-[0.3em] uppercase text-[#c9a96e] border-b border-[#c9a96e]/40 pb-2 hover:border-[#c9a96e] hover:text-[#f0eee9] transition-colors whitespace-nowrap"
+   856→          >
+   857→            Back to site
+   858→            <span>→</span>
+   859→          </Link>
+   860→        </div>
+   861→      </div>
+   862→    </main>
+   863→  );
+   864→}
+   865→

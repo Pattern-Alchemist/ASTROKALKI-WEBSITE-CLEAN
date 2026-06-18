@@ -1,0 +1,865 @@
+     1→"use client";
+     2→
+     3→/**
+     4→ * DraftPreview — client component for /admin/write.
+     5→ *
+     6→ * Renders the structured article draft returned by /api/ai/draft as a
+     7→ * sectioned preview that mirrors the live /insights/[slug] article page:
+     8→ *   - Title (large Playfair serif)
+     9→ *   - Excerpt (italic serif)
+    10→ *   - Concise answer card (gold-bordered, for AI Overviews)
+    11→ *   - Key takeaways (numbered 01–05, Cinzel monospace labels)
+    12→ *   - Body preview (markdown rendered to prose — NOT a full markdown renderer,
+    13→ *     just ## H2 + paragraphs. Inline edits happen on the raw markdown.)
+    14→ *   - FAQ (H3 question + paragraph answer)
+    15→ *   - References (numbered list with author / year / source)
+    16→ *   - Author bio (italic serif paragraph)
+    17→ *   - Related service CTA banner
+    18→ *
+    19→ * Every section is inline-editable:
+    20→ *   - Single-line fields (title, excerpt, conciseAnswer) → contentEditable
+    21→ *   - Multi-line fields (body, faqs, authorBio) → textarea on edit toggle
+    22→ *   - Array fields (keyTakeaways, faqs, references) → add/remove/reorder
+    23→ *
+    24→ * The component is a CONTROLLED draft — the parent owns the canonical
+    25→ * ArticleDraft state. Local edits call onChange(newDraft) which lifts the
+    26→ * change up.
+    27→ *
+    28→ * Design system: #050505 bg, gold #c9a96e accent, Playfair serif headlines,
+    29→ * Cinzel editorial labels, NO blue/indigo. Matches /admin/leads dark editorial.
+    30→ */
+    31→
+    32→import { useState } from "react";
+    33→import { motion, AnimatePresence } from "framer-motion";
+    34→import {
+    35→  Pencil,
+    36→  Check,
+    37→  X,
+    38→  Plus,
+    39→  Trash2,
+    40→  ChevronUp,
+    41→  ChevronDown,
+    42→  Download,
+    43→  FileText,
+    44→} from "lucide-react";
+    45→import type { ArticleDraft } from "@/lib/ai/writing-prompt";
+    46→
+    47→interface DraftPreviewProps {
+    48→  draft: ArticleDraft;
+    49→  onChange: (next: ArticleDraft) => void;
+    50→  onDownloadMarkdown: () => void;
+    51→  durationMs?: number;
+    52→}
+    53→
+    54→const CLUSTER_LABELS: Record<string, string> = {
+    55→  "relationship-patterns": "Relationship Patterns",
+    56→  "self-sabotage": "Self-Sabotage",
+    57→  "identity-purpose": "Identity & Purpose",
+    58→  "astrology-psychology": "Astrology + Psychology",
+    59→  "psychological-observations": "Psychological Observations",
+    60→};
+    61→
+    62→const SERVICE_LABELS: Record<string, string> = {
+    63→  "relationship-pattern-analysis": "Relationship Pattern Analysis",
+    64→  "karmic-relationship-reading": "Repeating-Partner Reading",
+    65→  "emotional-pattern-decode": "Emotional Pattern Decode",
+    66→  "shadow-work-consultation": "Shadow Work Consultation",
+    67→  "life-direction-session": "Life Direction Session",
+    68→};
+    69→
+    70→/** Section label — small caps Cinzel-style label used as eyebrow. */
+    71→function Eyebrow({ children }: { children: React.ReactNode }) {
+    72→  return (
+    73→    <p className="text-[10px] tracking-[0.4em] uppercase text-[#c9a96e]/70 mb-3 font-light">
+    74→      {children}
+    75→    </p>
+    76→  );
+    77→}
+    78→
+    79→/** Inline-editable single-line text field. */
+    80→function InlineTextField({
+    81→  value,
+    82→  onChange,
+    83→  placeholder,
+    84→  className = "",
+    85→  multiline = false,
+    86→}: {
+    87→  value: string;
+    88→  onChange: (next: string) => void;
+    89→  placeholder?: string;
+    90→  className?: string;
+    91→  multiline?: boolean;
+    92→}) {
+    93→  const [editing, setEditing] = useState(false);
+    94→  const [draft, setDraft] = useState(value);
+    95→
+    96→  if (editing) {
+    97→    const commit = () => {
+    98→      onChange(draft.trim());
+    99→      setEditing(false);
+   100→    };
+   101→    const cancel = () => {
+   102→      setDraft(value);
+   103→      setEditing(false);
+   104→    };
+   105→    return (
+   106→      <div className="relative">
+   107→        {multiline ? (
+   108→          <textarea
+   109→            autoFocus
+   110→            value={draft}
+   111→            onChange={(e) => setDraft(e.target.value)}
+   112→            placeholder={placeholder}
+   113→            rows={Math.min(12, Math.max(4, draft.split("\n").length + 1))}
+   114→            className={`w-full bg-[#0a0a0a] border border-[#c9a96e]/30 px-4 py-3 text-[#f0eee9] font-light focus:border-[#c9a96e] focus:outline-none resize-y ${className}`}
+   115→          />
+   116→        ) : (
+   117→          <input
+   118→            autoFocus
+   119→            type="text"
+   120→            value={draft}
+   121→            onChange={(e) => setDraft(e.target.value)}
+   122→            placeholder={placeholder}
+   123→            className={`w-full bg-[#0a0a0a] border border-[#c9a96e]/30 px-4 py-2 text-[#f0eee9] font-light focus:border-[#c9a96e] focus:outline-none ${className}`}
+   124→          />
+   125→        )}
+   126→        <div className="absolute -top-3 right-2 flex gap-1">
+   127→          <button
+   128→            onClick={commit}
+   129→            className="size-7 rounded-full bg-[#c9a96e] text-[#050505] flex items-center justify-center hover:bg-[#d4b878] transition-colors"
+   130→            title="Save"
+   131→          >
+   132→            <Check className="size-3.5" />
+   133→          </button>
+   134→          <button
+   135→            onClick={cancel}
+   136→            className="size-7 rounded-full bg-[#1a1a1a] text-[#9a9a9a] border border-white/10 flex items-center justify-center hover:text-[#f0eee9] transition-colors"
+   137→            title="Cancel"
+   138→          >
+   139→            <X className="size-3.5" />
+   140→          </button>
+   141→        </div>
+   142→      </div>
+   143→    );
+   144→  }
+   145→  return (
+   146→    <div
+   147→      className={`group relative cursor-text ${className}`}
+   148→      onClick={() => {
+   149→        setDraft(value);
+   150→        setEditing(true);
+   151→      }}
+   152→      title="Click to edit"
+   153→    >
+   154→      <span className={className}>{value || <span className="text-[#5a5a5a] italic">{placeholder}</span>}</span>
+   155→      <Pencil className="size-3 text-[#c9a96e] opacity-0 group-hover:opacity-70 transition-opacity inline-block ml-2 -mt-1" />
+   156→    </div>
+   157→  );
+   158→}
+   159→
+   160→/** Numbered key-takeaway bullet with edit/remove/reorder controls. */
+   161→function TakeawayRow({
+   162→  index,
+   163→  total,
+   164→  value,
+   165→  onChange,
+   166→  onRemove,
+   167→  onMoveUp,
+   168→  onMoveDown,
+   169→}: {
+   170→  index: number;
+   171→  total: number;
+   172→  value: string;
+   173→  onChange: (next: string) => void;
+   174→  onRemove: () => void;
+   175→  onMoveUp: () => void;
+   176→  onMoveDown: () => void;
+   177→}) {
+   178→  const [editing, setEditing] = useState(false);
+   179→  const [draft, setDraft] = useState(value);
+   180→
+   181→  if (editing) {
+   182→    return (
+   183→      <div className="flex gap-3 items-start">
+   184→        <span className="text-[11px] tracking-[0.2em] text-[#c9a96e]/60 mt-3 font-mono shrink-0">
+   185→          {String(index + 1).padStart(2, "0")}
+   186→        </span>
+   187→        <textarea
+   188→          autoFocus
+   189→          value={draft}
+   190→          onChange={(e) => setDraft(e.target.value)}
+   191→          rows={Math.min(6, Math.max(2, draft.split("\n").length + 1))}
+   192→          className="flex-1 bg-[#0a0a0a] border border-[#c9a96e]/30 px-3 py-2 text-[#cfcabf] text-sm font-light focus:border-[#c9a96e] focus:outline-none resize-y"
+   193→        />
+   194→        <div className="flex flex-col gap-1 shrink-0">
+   195→          <button
+   196→            onClick={() => {
+   197→              onChange(draft.trim());
+   198→              setEditing(false);
+   199→            }}
+   200→            className="size-7 rounded-full bg-[#c9a96e] text-[#050505] flex items-center justify-center hover:bg-[#d4b878] transition-colors"
+   201→            title="Save"
+   202→          >
+   203→            <Check className="size-3.5" />
+   204→          </button>
+   205→          <button
+   206→            onClick={() => {
+   207→              setDraft(value);
+   208→              setEditing(false);
+   209→            }}
+   210→            className="size-7 rounded-full bg-[#1a1a1a] text-[#9a9a9a] border border-white/10 flex items-center justify-center hover:text-[#f0eee9] transition-colors"
+   211→            title="Cancel"
+   212→          >
+   213→            <X className="size-3.5" />
+   214→          </button>
+   215→        </div>
+   216→      </div>
+   217→    );
+   218→  }
+   219→
+   220→  return (
+   221→    <div className="flex gap-3 items-start group">
+   222→      <span className="text-[11px] tracking-[0.2em] text-[#c9a96e]/60 mt-1 font-mono shrink-0">
+   223→        {String(index + 1).padStart(2, "0")}
+   224→      </span>
+   225→      <p
+   226→        className="flex-1 text-[#cfcabf] text-sm leading-[1.7] font-light cursor-text"
+   227→        onClick={() => setEditing(true)}
+   228→      >
+   229→        {value}
+   230→      </p>
+   231→      <div className="flex flex-col gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+   232→        <button
+   233→          onClick={onMoveUp}
+   234→          disabled={index === 0}
+   235→          className="text-[#5a5a5a] hover:text-[#c9a96e] disabled:opacity-20 disabled:cursor-not-allowed"
+   236→          title="Move up"
+   237→        >
+   238→          <ChevronUp className="size-3.5" />
+   239→        </button>
+   240→        <button
+   241→          onClick={onMoveDown}
+   242→          disabled={index === total - 1}
+   243→          className="text-[#5a5a5a] hover:text-[#c9a96e] disabled:opacity-20 disabled:cursor-not-allowed"
+   244→          title="Move down"
+   245→        >
+   246→          <ChevronDown className="size-3.5" />
+   247→        </button>
+   248→        <button
+   249→          onClick={onRemove}
+   250→          className="text-[#5a5a5a] hover:text-red-400"
+   251→          title="Remove"
+   252→        >
+   253→          <Trash2 className="size-3.5" />
+   254→        </button>
+   255→      </div>
+   256→    </div>
+   257→  );
+   258→}
+   259→
+   260→/** Editable FAQ pair. */
+   261→function FaqRow({
+   262→  index,
+   263→  q,
+   264→  a,
+   265→  onChange,
+   266→  onRemove,
+   267→}: {
+   268→  index: number;
+   269→  q: string;
+   270→  a: string;
+   271→  onChange: (next: { q: string; a: string }) => void;
+   272→  onRemove: () => void;
+   273→}) {
+   274→  const [editing, setEditing] = useState(false);
+   275→  const [qDraft, setQDraft] = useState(q);
+   276→  const [aDraft, setADraft] = useState(a);
+   277→
+   278→  if (editing) {
+   279→    return (
+   280→      <div className="border border-[#c9a96e]/30 p-4 bg-[#0a0a0a]">
+   281→        <div className="flex justify-between mb-3">
+   282→          <span className="text-[10px] tracking-[0.3em] uppercase text-[#c9a96e]/70">
+   283→            FAQ {String(index + 1).padStart(2, "0")}
+   284→          </span>
+   285→          <div className="flex gap-1">
+   286→            <button
+   287→              onClick={() => {
+   288→                onChange({ q: qDraft.trim(), a: aDraft.trim() });
+   289→                setEditing(false);
+   290→              }}
+   291→              className="size-7 rounded-full bg-[#c9a96e] text-[#050505] flex items-center justify-center hover:bg-[#d4b878] transition-colors"
+   292→              title="Save"
+   293→            >
+   294→              <Check className="size-3.5" />
+   295→            </button>
+   296→            <button
+   297→              onClick={() => {
+   298→                setQDraft(q);
+   299→                setADraft(a);
+   300→                setEditing(false);
+   301→              }}
+   302→              className="size-7 rounded-full bg-[#1a1a1a] text-[#9a9a9a] border border-white/10 flex items-center justify-center hover:text-[#f0eee9] transition-colors"
+   303→              title="Cancel"
+   304→            >
+   305→              <X className="size-3.5" />
+   306→            </button>
+   307→          </div>
+   308→        </div>
+   309→        <input
+   310→          type="text"
+   311→          value={qDraft}
+   312→          onChange={(e) => setQDraft(e.target.value)}
+   313→          placeholder="Question"
+   314→          className="w-full bg-transparent border-b border-white/10 px-1 py-2 mb-3 text-[#f0eee9] font-serif text-lg focus:border-[#c9a96e] focus:outline-none"
+   315→        />
+   316→        <textarea
+   317→          value={aDraft}
+   318→          onChange={(e) => setADraft(e.target.value)}
+   319→          placeholder="Answer"
+   320→          rows={Math.min(8, Math.max(3, aDraft.split("\n").length + 1))}
+   321→          className="w-full bg-transparent border border-white/10 px-3 py-2 text-[#cfcabf] text-sm font-light focus:border-[#c9a96e] focus:outline-none resize-y"
+   322→        />
+   323→      </div>
+   324→    );
+   325→  }
+   326→
+   327→  return (
+   328→    <div className="group border-l border-[#c9a96e]/20 pl-5 py-2 cursor-text" onClick={() => setEditing(true)}>
+   329→      <div className="flex items-start justify-between gap-3">
+   330→        <h3 className="text-lg sm:text-xl font-serif text-[#f0eee9] font-light tracking-[-0.01em]">
+   331→          {q}
+   332→        </h3>
+   333→        <div className="flex gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+   334→          <button
+   335→            onClick={(e) => {
+   336→              e.stopPropagation();
+   337→              onRemove();
+   338→            }}
+   339→            className="text-[#5a5a5a] hover:text-red-400"
+   340→            title="Remove"
+   341→          >
+   342→            <Trash2 className="size-3.5" />
+   343→          </button>
+   344→        </div>
+   345→      </div>
+   346→      <p className="text-[#cfcabf] text-base leading-[1.8] font-light mt-2">
+   347→        {a}
+   348→      </p>
+   349→    </div>
+   350→  );
+   351→}
+   352→
+   353→/** Editable reference row. */
+   354→function ReferenceRow({
+   355→  index,
+   356→  reference,
+   357→  onChange,
+   358→  onRemove,
+   359→}: {
+   360→  index: number;
+   361→  reference: { title: string; author?: string; year?: number; source?: string; url?: string };
+   362→  onChange: (next: typeof reference) => void;
+   363→  onRemove: () => void;
+   364→}) {
+   365→  const [editing, setEditing] = useState(false);
+   366→  const [draft, setDraft] = useState(reference);
+   367→
+   368→  if (editing) {
+   369→    return (
+   370→      <div className="border border-[#c9a96e]/30 p-4 bg-[#0a0a0a] space-y-2">
+   371→        <div className="flex justify-between mb-1">
+   372→          <span className="text-[10px] tracking-[0.3em] uppercase text-[#c9a96e]/70">
+   373→            Reference {String(index + 1).padStart(2, "0")}
+   374→          </span>
+   375→          <div className="flex gap-1">
+   376→            <button
+   377→              onClick={() => {
+   378→                onChange(draft);
+   379→                setEditing(false);
+   380→              }}
+   381→              className="size-7 rounded-full bg-[#c9a96e] text-[#050505] flex items-center justify-center hover:bg-[#d4b878] transition-colors"
+   382→              title="Save"
+   383→            >
+   384→              <Check className="size-3.5" />
+   385→            </button>
+   386→            <button
+   387→              onClick={() => {
+   388→                setDraft(reference);
+   389→                setEditing(false);
+   390→              }}
+   391→              className="size-7 rounded-full bg-[#1a1a1a] text-[#9a9a9a] border border-white/10 flex items-center justify-center hover:text-[#f0eee9] transition-colors"
+   392→              title="Cancel"
+   393→            >
+   394→              <X className="size-3.5" />
+   395→            </button>
+   396→          </div>
+   397→        </div>
+   398→        <input
+   399→          type="text"
+   400→          value={draft.title}
+   401→          onChange={(e) => setDraft({ ...draft, title: e.target.value })}
+   402→          placeholder="Title (required)"
+   403→          className="w-full bg-transparent border-b border-white/10 px-1 py-1.5 text-[#f0eee9] text-sm focus:border-[#c9a96e] focus:outline-none"
+   404→        />
+   405→        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+   406→          <input
+   407→            type="text"
+   408→            value={draft.author || ""}
+   409→            onChange={(e) => setDraft({ ...draft, author: e.target.value })}
+   410→            placeholder="Author (Last, F.)"
+   411→            className="bg-transparent border-b border-white/10 px-1 py-1.5 text-[#cfcabf] text-xs focus:border-[#c9a96e] focus:outline-none"
+   412→          />
+   413→          <input
+   414→            type="text"
+   415→            value={draft.year?.toString() || ""}
+   416→            onChange={(e) =>
+   417→              setDraft({
+   418→                ...draft,
+   419→                year: /^\d{4}$/.test(e.target.value)
+   420→                  ? parseInt(e.target.value, 10)
+   421→                  : undefined,
+   422→              })
+   423→            }
+   424→            placeholder="Year (YYYY)"
+   425→            className="bg-transparent border-b border-white/10 px-1 py-1.5 text-[#cfcabf] text-xs focus:border-[#c9a96e] focus:outline-none"
+   426→          />
+   427→          <input
+   428→            type="text"
+   429→            value={draft.source || ""}
+   430→            onChange={(e) => setDraft({ ...draft, source: e.target.value })}
+   431→            placeholder="Source (Book / Paper)"
+   432→            className="bg-transparent border-b border-white/10 px-1 py-1.5 text-[#cfcabf] text-xs focus:border-[#c9a96e] focus:outline-none"
+   433→          />
+   434→        </div>
+   435→        <input
+   436→          type="text"
+   437→          value={draft.url || ""}
+   438→          onChange={(e) => setDraft({ ...draft, url: e.target.value })}
+   439→          placeholder="URL (optional)"
+   440→          className="w-full bg-transparent border-b border-white/10 px-1 py-1.5 text-[#cfcabf] text-xs focus:border-[#c9a96e] focus:outline-none"
+   441→        />
+   442→      </div>
+   443→    );
+   444→  }
+   445→
+   446→  return (
+   447→    <div
+   448→      className="group flex gap-3 items-start cursor-text py-2 border-b border-white/[0.04] last:border-b-0"
+   449→      onClick={() => setEditing(true)}
+   450→    >
+   451→      <span className="text-[11px] tracking-[0.2em] text-[#c9a96e]/60 mt-1 font-mono shrink-0">
+   452→        {String(index + 1).padStart(2, "0")}
+   453→      </span>
+   454→      <div className="flex-1">
+   455→        <p className="text-[#f0eee9] text-sm font-light italic">{reference.title}</p>
+   456→        <p className="text-[#7a7a7a] text-xs mt-1">
+   457→          {reference.author || "—"}{reference.year ? ` (${reference.year})` : ""}
+   458→          {reference.source ? ` · ${reference.source}` : ""}
+   459→        </p>
+   460→      </div>
+   461→      <button
+   462→        onClick={(e) => {
+   463→          e.stopPropagation();
+   464→          onRemove();
+   465→        }}
+   466→        className="text-[#5a5a5a] hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity"
+   467→        title="Remove"
+   468→      >
+   469→        <Trash2 className="size-3.5" />
+   470→      </button>
+   471→    </div>
+   472→  );
+   473→}
+   474→
+   475→/**
+   476→ * Lightweight markdown → prose renderer for the body preview.
+   477→ * Handles # H1, ## H2, ### H3, paragraphs, and **bold** + *italic* + [links](url).
+   478→ * Not a full markdown renderer — for the editor, we want enough to read the
+   479→ * draft at a glance. The Download-as-markdown button ships the raw markdown.
+   480→ */
+   481→function renderMarkdownPreview(md: string): React.ReactNode {
+   482→  const lines = md.split("\n");
+   483→  const blocks: React.ReactNode[] = [];
+   484→  let para: string[] = [];
+   485→
+   486→  const flushPara = () => {
+   487→    if (para.length === 0) return;
+   488→    const text = para.join(" ").trim();
+   489→    if (text) {
+   490→      blocks.push(
+   491→        <p
+   492→          key={`p-${blocks.length}`}
+   493→          className="text-[#cfcabf] text-base leading-[1.85] font-light mb-5"
+   494→        >
+   495→          {renderInline(text)}
+   496→        </p>
+   497→      );
+   498→    }
+   499→    para = [];
+   500→  };
+   501→
+   502→  for (const line of lines) {
+   503→    const trimmed = line.trim();
+   504→    if (!trimmed) {
+   505→      flushPara();
+   506→      continue;
+   507→    }
+   508→    if (trimmed.startsWith("### ")) {
+   509→      flushPara();
+   510→      blocks.push(
+   511→        <h3
+   512→          key={`h3-${blocks.length}`}
+   513→          className="text-lg font-serif text-[#f0eee9] font-light tracking-[-0.01em] mt-8 mb-3"
+   514→        >
+   515→          {renderInline(trimmed.slice(4))}
+   516→        </h3>
+   517→      );
+   518→    } else if (trimmed.startsWith("## ")) {
+   519→      flushPara();
+   520→      blocks.push(
+   521→        <h2
+   522→          key={`h2-${blocks.length}`}
+   523→          className="text-2xl font-serif text-[#f0eee9] font-light tracking-[-0.02em] mt-10 mb-4"
+   524→        >
+   525→          {renderInline(trimmed.slice(3))}
+   526→        </h2>
+   527→      );
+   528→    } else if (trimmed.startsWith("# ")) {
+   529→      flushPara();
+   530→      blocks.push(
+   531→        <h1
+   532→          key={`h1-${blocks.length}`}
+   533→          className="text-3xl font-serif text-[#f0eee9] font-light tracking-[-0.02em] mt-8 mb-5"
+   534→        >
+   535→          {renderInline(trimmed.slice(2))}
+   536→        </h1>
+   537→      );
+   538→    } else {
+   539→      para.push(trimmed);
+   540→    }
+   541→  }
+   542→  flushPara();
+   543→  return blocks;
+   544→}
+   545→
+   546→/** Render inline markdown: **bold**, *italic*, [text](url). */
+   547→function renderInline(text: string): React.ReactNode {
+   548→  // Tokenize on **bold**, *italic*, [text](url) — naive but adequate for preview.
+   549→  const tokens = text.split(
+   550→    /(\*\*[^*]+\*\*|\*[^*]+\*|\[[^\]]+\]\([^)]+\))/
+   551→  );
+   552→  return tokens.map((tok, i) => {
+   553→    if (!tok) return null;
+   554→    if (tok.startsWith("**") && tok.endsWith("**")) {
+   555→      return (
+   556→        <strong key={i} className="text-[#f0eee9] font-medium">
+   557→          {tok.slice(2, -2)}
+   558→        </strong>
+   559→      );
+   560→    }
+   561→    if (tok.startsWith("*") && tok.endsWith("*") && tok.length > 2) {
+   562→      return (
+   563→        <em key={i} className="italic text-[#cfcabf]">
+   564→          {tok.slice(1, -1)}
+   565→        </em>
+   566→      );
+   567→    }
+   568→    const linkMatch = tok.match(/^\[([^\]]+)\]\(([^)]+)\)$/);
+   569→    if (linkMatch) {
+   570→      return (
+   571→        <a
+   572→          key={i}
+   573→          href={linkMatch[2]}
+   574→          target="_blank"
+   575→          rel="noopener noreferrer"
+   576→          className="text-[#c9a96e] underline-offset-4 hover:underline"
+   577→        >
+   578→          {linkMatch[1]}
+   579→        </a>
+   580→      );
+   581→    }
+   582→    return <span key={i}>{tok}</span>;
+   583→  });
+   584→}
+   585→
+   586→export default function DraftPreview({
+   587→  draft,
+   588→  onChange,
+   589→  onDownloadMarkdown,
+   590→  durationMs,
+   591→}: DraftPreviewProps) {
+   592→  const wordCount = draft.body
+   593→    ? draft.body.split(/\s+/).filter(Boolean).length
+   594→    : 0;
+   595→
+   596→  const updateField = <K extends keyof ArticleDraft>(
+   597→    key: K,
+   598→    value: ArticleDraft[K]
+   599→  ) => onChange({ ...draft, [key]: value });
+   600→
+   601→  const moveTakeaway = (i: number, dir: -1 | 1) => {
+   602→    const next = [...draft.keyTakeaways];
+   603→    const j = i + dir;
+   604→    if (j < 0 || j >= next.length) return;
+   605→    [next[i], next[j]] = [next[j], next[i]];
+   606→    updateField("keyTakeaways", next);
+   607→  };
+   608→
+   609→  return (
+   610→    <motion.article
+   611→      initial={{ opacity: 0, y: 12 }}
+   612→      animate={{ opacity: 1, y: 0 }}
+   613→      transition={{ duration: 0.5, ease: [0.4, 0, 0.2, 1] }}
+   614→      className="space-y-10"
+   615→    >
+   616→      {/* ─── Meta strip ─────────────────────────────────────────────── */}
+   617→      <div className="flex flex-wrap items-center gap-4 text-[10px] tracking-[0.3em] uppercase text-[#5a5a5a] border-b border-white/[0.04] pb-4">
+   618→        <span className="text-[#c9a96e]">
+   619→          {CLUSTER_LABELS[draft.category] || draft.category || "—"}
+   620→        </span>
+   621→        <span>·</span>
+   622→        <span>{wordCount} words</span>
+   623→        {durationMs ? (
+   624→          <>
+   625→            <span>·</span>
+   626→            <span>{(durationMs / 1000).toFixed(1)}s generation</span>
+   627→          </>
+   628→        ) : null}
+   629→        <span>·</span>
+   630→        <span>
+   631→          {SERVICE_LABELS[draft.relatedService] || draft.relatedService || "—"}
+   632→        </span>
+   633→        <button
+   634→          onClick={onDownloadMarkdown}
+   635→          className="ml-auto inline-flex items-center gap-1.5 text-[#c9a96e] hover:text-[#f0eee9] transition-colors border border-[#c9a96e]/30 px-3 py-1.5"
+   636→          title="Download draft as markdown"
+   637→        >
+   638→          <Download className="size-3" />
+   639→          Download .md
+   640→        </button>
+   641→      </div>
+   642→
+   643→      {/* ─── Title ─────────────────────────────────────────────────── */}
+   644→      <section>
+   645→        <Eyebrow>Title</Eyebrow>
+   646→        <InlineTextField
+   647→          value={draft.title}
+   648→          onChange={(v) => updateField("title", v)}
+   649→          placeholder="Article title"
+   650→          className="text-3xl sm:text-4xl font-serif text-[#f0eee9] font-light tracking-[-0.02em] leading-tight block"
+   651→        />
+   652→      </section>
+   653→
+   654→      {/* ─── Excerpt ───────────────────────────────────────────────── */}
+   655→      <section>
+   656→        <Eyebrow>Excerpt</Eyebrow>
+   657→        <InlineTextField
+   658→          value={draft.excerpt}
+   659→          onChange={(v) => updateField("excerpt", v)}
+   660→          placeholder="120-word excerpt"
+   661→          multiline
+   662→          className="text-[#cfcabf] text-base sm:text-lg leading-[1.85] font-light italic block"
+   663→        />
+   664→      </section>
+   665→
+   666→      {/* ─── Concise answer ────────────────────────────────────────── */}
+   667→      <section className="border border-[#c9a96e]/20 bg-white/[0.015] p-6 sm:p-8">
+   668→        <Eyebrow>Concise answer · for AI Overviews</Eyebrow>
+   669→        <InlineTextField
+   670→          value={draft.conciseAnswer}
+   671→          onChange={(v) => updateField("conciseAnswer", v)}
+   672→          placeholder="3–4 sentence answer"
+   673→          multiline
+   674→          className="text-[#cfcabf] text-base sm:text-lg leading-[1.85] font-light block"
+   675→        />
+   676→      </section>
+   677→
+   678→      {/* ─── Key takeaways ─────────────────────────────────────────── */}
+   679→      <section>
+   680→        <Eyebrow>Key takeaways</Eyebrow>
+   681→        <div className="space-y-4">
+   682→          <AnimatePresence initial={false}>
+   683→            {draft.keyTakeaways.map((tk, i) => (
+   684→              <motion.div
+   685→                key={i}
+   686→                initial={{ opacity: 0 }}
+   687→                animate={{ opacity: 1 }}
+   688→                exit={{ opacity: 0 }}
+   689→              >
+   690→                <TakeawayRow
+   691→                  index={i}
+   692→                  total={draft.keyTakeaways.length}
+   693→                  value={tk}
+   694→                  onChange={(v) => {
+   695→                    const next = [...draft.keyTakeaways];
+   696→                    next[i] = v;
+   697→                    updateField("keyTakeaways", next);
+   698→                  }}
+   699→                  onRemove={() => {
+   700→                    const next = draft.keyTakeaways.filter((_, j) => j !== i);
+   701→                    updateField("keyTakeaways", next);
+   702→                  }}
+   703→                  onMoveUp={() => moveTakeaway(i, -1)}
+   704→                  onMoveDown={() => moveTakeaway(i, 1)}
+   705→                />
+   706→              </motion.div>
+   707→            ))}
+   708→          </AnimatePresence>
+   709→          <button
+   710→            onClick={() =>
+   711→              updateField("keyTakeaways", [...draft.keyTakeaways, "New takeaway"])
+   712→            }
+   713→            className="inline-flex items-center gap-2 text-[11px] tracking-[0.3em] uppercase text-[#5a5a5a] hover:text-[#c9a96e] transition-colors mt-2"
+   714→          >
+   715→            <Plus className="size-3" />
+   716→            Add takeaway
+   717→          </button>
+   718→        </div>
+   719→      </section>
+   720→
+   721→      {/* ─── Body ──────────────────────────────────────────────────── */}
+   722→      <section>
+   723→        <Eyebrow>Body · markdown</Eyebrow>
+   724→        <div className="border border-white/[0.04] bg-white/[0.01] p-6 sm:p-8">
+   725→          <div className="prose-preview max-w-none">
+   726→            {renderMarkdownPreview(draft.body)}
+   727→          </div>
+   728→        </div>
+   729→        <div className="mt-3">
+   730→          <InlineTextField
+   731→            value={draft.body}
+   732→            onChange={(v) => updateField("body", v)}
+   733→            placeholder="Body markdown"
+   734→            multiline
+   735→            className="text-[#cfcabf] text-xs leading-[1.7] font-mono block w-full"
+   736→          />
+   737→        </div>
+   738→        <p className="text-[10px] tracking-[0.2em] uppercase text-[#5a5a5a] mt-2 flex items-center gap-1.5">
+   739→          <FileText className="size-3" />
+   740→          Click above to edit raw markdown · {wordCount} words · aim for 1500+
+   741→        </p>
+   742→      </section>
+   743→
+   744→      {/* ─── FAQs ──────────────────────────────────────────────────── */}
+   745→      <section>
+   746→        <Eyebrow>FAQs</Eyebrow>
+   747→        <div className="space-y-6">
+   748→          <AnimatePresence initial={false}>
+   749→            {draft.faqs.map((f, i) => (
+   750→              <motion.div
+   751→                key={i}
+   752→                initial={{ opacity: 0 }}
+   753→                animate={{ opacity: 1 }}
+   754→                exit={{ opacity: 0 }}
+   755→              >
+   756→                <FaqRow
+   757→                  index={i}
+   758→                  q={f.q}
+   759→                  a={f.a}
+   760→                  onChange={(next) => {
+   761→                    const faqs = [...draft.faqs];
+   762→                    faqs[i] = next;
+   763→                    updateField("faqs", faqs);
+   764→                  }}
+   765→                  onRemove={() => {
+   766→                    const faqs = draft.faqs.filter((_, j) => j !== i);
+   767→                    updateField("faqs", faqs);
+   768→                  }}
+   769→                />
+   770→              </motion.div>
+   771→            ))}
+   772→          </AnimatePresence>
+   773→          <button
+   774→            onClick={() =>
+   775→              updateField("faqs", [
+   776→                ...draft.faqs,
+   777→                { q: "New question?", a: "New answer." },
+   778→              ])
+   779→            }
+   780→            className="inline-flex items-center gap-2 text-[11px] tracking-[0.3em] uppercase text-[#5a5a5a] hover:text-[#c9a96e] transition-colors mt-2"
+   781→          >
+   782→            <Plus className="size-3" />
+   783→            Add FAQ
+   784→          </button>
+   785→        </div>
+   786→      </section>
+   787→
+   788→      {/* ─── References ────────────────────────────────────────────── */}
+   789→      <section>
+   790→        <Eyebrow>References</Eyebrow>
+   791→        <div className="border border-white/[0.04] bg-white/[0.01] p-6 sm:p-8 space-y-1">
+   792→          <AnimatePresence initial={false}>
+   793→            {draft.references.map((r, i) => (
+   794→              <motion.div
+   795→                key={i}
+   796→                initial={{ opacity: 0 }}
+   797→                animate={{ opacity: 1 }}
+   798→                exit={{ opacity: 0 }}
+   799→              >
+   800→                <ReferenceRow
+   801→                  index={i}
+   802→                  reference={r}
+   803→                  onChange={(next) => {
+   804→                    const refs = [...draft.references];
+   805→                    refs[i] = next;
+   806→                    updateField("references", refs);
+   807→                  }}
+   808→                  onRemove={() => {
+   809→                    const refs = draft.references.filter((_, j) => j !== i);
+   810→                    updateField("references", refs);
+   811→                  }}
+   812→                />
+   813→              </motion.div>
+   814→            ))}
+   815→          </AnimatePresence>
+   816→          <button
+   817→            onClick={() =>
+   818→              updateField("references", [
+   819→                ...draft.references,
+   820→                { title: "New reference", author: "", year: undefined, source: "" },
+   821→              ])
+   822→            }
+   823→            className="inline-flex items-center gap-2 text-[11px] tracking-[0.3em] uppercase text-[#5a5a5a] hover:text-[#c9a96e] transition-colors mt-3"
+   824→          >
+   825→            <Plus className="size-3" />
+   826→            Add reference
+   827→          </button>
+   828→        </div>
+   829→      </section>
+   830→
+   831→      {/* ─── Author bio ────────────────────────────────────────────── */}
+   832→      <section>
+   833→        <Eyebrow>Author bio</Eyebrow>
+   834→        <InlineTextField
+   835→          value={draft.authorBio}
+   836→          onChange={(v) => updateField("authorBio", v)}
+   837→          placeholder="3–5 sentence author bio"
+   838→          multiline
+   839→          className="text-[#cfcabf] text-base leading-[1.85] font-light italic block"
+   840→        />
+   841→      </section>
+   842→
+   843→      {/* ─── Related service ───────────────────────────────────────── */}
+   844→      <section className="border-t border-[#c9a96e]/20 pt-8">
+   845→        <Eyebrow>Related service CTA</Eyebrow>
+   846→        <div className="flex flex-wrap gap-2">
+   847→          {Object.entries(SERVICE_LABELS).map(([slug, label]) => (
+   848→            <button
+   849→              key={slug}
+   850→              onClick={() => updateField("relatedService", slug)}
+   851→              className={`text-[11px] tracking-[0.25em] uppercase px-3 py-2 border transition-colors ${
+   852→                draft.relatedService === slug
+   853→                  ? "border-[#c9a96e] text-[#c9a96e] bg-[#c9a96e]/10"
+   854→                  : "border-white/10 text-[#7a7a7a] hover:text-[#f0eee9] hover:border-white/30"
+   855→              }`}
+   856→            >
+   857→              {label}
+   858→            </button>
+   859→          ))}
+   860→        </div>
+   861→      </section>
+   862→    </motion.article>
+   863→  );
+   864→}
+   865→

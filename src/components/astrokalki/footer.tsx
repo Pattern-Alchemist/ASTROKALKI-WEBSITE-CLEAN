@@ -90,6 +90,9 @@ export default function Footer() {
               <Link href="/chart-reading" className="block text-[11px] text-[#7a7a7a] hover:text-[#c9a96e] transition-colors" title="Upload your birth chart — AI pattern recognition analysis">
                 Chart Reading
               </Link>
+              <Link href="/birth-chart" className="block text-[11px] text-[#7a7a7a] hover:text-[#c9a96e] transition-colors" title="Free Vedic birth chart calculator — JPL ephemeris, Lahiri ayanamsa, North Indian style SVG">
+                Birth Chart Calculator
+              </Link>
             </div>
           </div>
 
@@ -107,6 +110,9 @@ export default function Footer() {
               </Link>
               <Link href="/testimonials" className="block text-[11px] text-[#7a7a7a] hover:text-[#c9a96e] transition-colors">
                 Testimonials
+              </Link>
+              <Link href="/case-studies" className="block text-[11px] text-[#7a7a7a] hover:text-[#c9a96e] transition-colors" title="Anonymised long-form client journeys — Problem, Pattern, Session, Shift">
+                Case Studies
               </Link>
               <Link href="/faq" className="block text-[11px] text-[#7a7a7a] hover:text-[#c9a96e] transition-colors">
                 FAQ

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowLeft, RefreshCw, Star, Mail, Clock } from "lucide-react";
+import { ArrowLeft, RefreshCw, Star, Mail, Clock, BadgeCheck } from "lucide-react";
 import { db } from "@/lib/db";
 import TestimonialActions from "./TestimonialActions";
 
@@ -76,6 +76,9 @@ interface TestimonialRow {
   status: string;
   createdAt: Date;
   updatedAt: Date;
+  verified?: boolean;
+  verifiedBookingId?: string | null;
+  verifiedAt?: Date | null;
 }
 
 export default async function AdminTestimonialsPage({
@@ -115,7 +118,32 @@ export default async function AdminTestimonialsPage({
       db.testimonial.count({ where: { status: "rejected" } }),
       db.testimonial.count(),
     ]);
-    testimonials = rows as TestimonialRow[];
+
+    // ─── Fetch VerifiedReview rows for these testimonials ──────────
+    // There's no Prisma @relation between Testimonial and VerifiedReview,
+    // so we resolve the link here and attach a `verified` boolean (plus
+    // the linked bookingId + verifiedAt for display in the admin UI).
+    // Empty `in: []` would crash Prisma, so guard with .length.
+    const ids = rows.map((t) => t.id);
+    const verifiedReviews = ids.length
+      ? await db.verifiedReview.findMany({
+          where: { testimonialId: { in: ids } },
+          select: { testimonialId: true, bookingId: true, verifiedAt: true },
+        })
+      : [];
+    const verifiedByTestimonial = new Map(
+      verifiedReviews.map((v) => [v.testimonialId, v])
+    );
+
+    testimonials = rows.map((t) => {
+      const v = verifiedByTestimonial.get(t.id);
+      return {
+        ...(t as TestimonialRow),
+        verified: Boolean(v),
+        verifiedBookingId: v?.bookingId ?? null,
+        verifiedAt: v?.verifiedAt ?? null,
+      };
+    });
     counts = {
       pending,
       approved,
@@ -230,6 +258,24 @@ export default async function AdminTestimonialsPage({
                     <span className="inline-flex items-center gap-1 text-[#c9a96e]">
                       <Star className="size-3 fill-[#c9a96e]" />
                       Featured
+                    </span>
+                  )}
+                  {t.verified && (
+                    <span
+                      className="inline-flex items-center gap-1.5 text-[#c9a96e] border border-[#c9a96e]/40 px-2 py-0.5 rounded"
+                      title={`This testimonial is linked to a verified completed session (booking ${t.verifiedBookingId ?? "—"}, verified ${t.verifiedAt ? formatDate(t.verifiedAt) : "—"})`}
+                    >
+                      <BadgeCheck
+                        className="size-3"
+                        strokeWidth={1.5}
+                        aria-hidden="true"
+                      />
+                      <span
+                        className="text-[9px] tracking-[0.2em] uppercase"
+                        style={{ fontFamily: "Cinzel, Georgia, serif" }}
+                      >
+                        Verified Session
+                      </span>
                     </span>
                   )}
                   <span className="text-[#5a5a5a] font-mono normal-case tracking-normal">

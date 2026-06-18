@@ -26,6 +26,11 @@ import {
   Quote,
   Disc3,
   Radio,
+  Globe,
+  PenLine,
+  Images,
+  MapPin,
+  FileText,
 } from "lucide-react";
 
 import {
@@ -434,12 +439,28 @@ export default function AdminDashboard() {
                 <span className="hidden sm:inline">Testimonials</span>
               </Link>
               <Link
+                href="/admin/case-studies"
+                className="btn-outline-gold px-3 py-1.5 rounded-md text-xs flex items-center gap-1.5"
+                title="Long-form anonymised client journeys — Problem, Pattern, Session, Shift"
+              >
+                <FileText className="size-3" />
+                <span className="hidden sm:inline">Case Studies</span>
+              </Link>
+              <Link
                 href="/admin/analytics"
                 className="btn-outline-gold px-3 py-1.5 rounded-md text-xs flex items-center gap-1.5"
                 title="Behaviour & conversion analytics"
               >
                 <BarChart3 className="size-3" />
                 <span className="hidden sm:inline">Analytics</span>
+              </Link>
+              <Link
+                href="/admin/revenue"
+                className="btn-outline-gold px-3 py-1.5 rounded-md text-xs flex items-center gap-1.5"
+                title="Revenue, churn & cohort analytics"
+              >
+                <TrendingUp className="size-3" />
+                <span className="hidden sm:inline">Revenue</span>
               </Link>
               <Link
                 href="/admin/referrals"
@@ -464,6 +485,38 @@ export default function AdminDashboard() {
               >
                 <Radio className="size-3" />
                 <span className="hidden sm:inline">Availability</span>
+              </Link>
+              <Link
+                href="/admin/write"
+                className="btn-outline-gold px-3 py-1.5 rounded-md text-xs flex items-center gap-1.5"
+                title="AI writing assistant — draft new articles in the AstroKalki voice"
+              >
+                <PenLine className="size-3" />
+                <span className="hidden sm:inline">Write</span>
+              </Link>
+              <Link
+                href="/admin/programmatic"
+                className="btn-outline-gold px-3 py-1.5 rounded-md text-xs flex items-center gap-1.5"
+                title="Programmatic SEO — city × pattern landing pages"
+              >
+                <Globe className="size-3" />
+                <span className="hidden sm:inline">SEO Pages</span>
+              </Link>
+              <Link
+                href="/admin/seo"
+                className="btn-outline-gold px-3 py-1.5 rounded-md text-xs flex items-center gap-1.5"
+                title="Local SEO — 200+ city × pattern pages (LOCAL generator, no LLM)"
+              >
+                <MapPin className="size-3" />
+                <span className="hidden sm:inline">Local SEO</span>
+              </Link>
+              <Link
+                href="/admin/social-images"
+                className="btn-outline-gold px-3 py-1.5 rounded-md text-xs flex items-center gap-1.5"
+                title="AI-generated social share images for every article + guide"
+              >
+                <Images className="size-3" />
+                <span className="hidden sm:inline">Social Images</span>
               </Link>
               <a
                 href="/"

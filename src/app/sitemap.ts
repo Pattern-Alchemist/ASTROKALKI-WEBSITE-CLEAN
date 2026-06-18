@@ -5,6 +5,9 @@ import { CLUSTERS } from "@/lib/content/clusters";
 import { AUTHOR } from "@/lib/content/author";
 import { GUIDES } from "@/lib/content/guides";
 import { ATLAS_PATTERNS } from "@/lib/content/patterns/atlas";
+import { SEO_CITIES } from "@/lib/seo/cities";
+import { CASE_STUDY_SEEDS } from "@/lib/content/case-study-seed";
+import { db } from "@/lib/db";
 
 /**
  * Dynamic sitemap — covers all routes the user directive specifies:
@@ -21,6 +24,8 @@ import { ATLAS_PATTERNS } from "@/lib/content/patterns/atlas";
  *   - /what-to-expect trust page
  *   - /membership — subscription tiers page (NEW)
  *   - /testimonials/submit — public testimonial submission (NEW)
+ *   - /case-studies — anonymised long-form client journeys hub (M9-d)
+ *   - /case-studies/[slug] — individual case study pages (dynamic, from DB) (M9-d)
  *
  * Excludes: /admin, /api, /account (auth-gated), /unsubscribe (noindex routes)
  *
@@ -44,7 +49,7 @@ const PILLAR_SLUGS = [
   "self-doubt",
 ];
 
-export default function sitemap(): MetadataRoute.Sitemap {
+export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const now = new Date();
 
   const staticPages: MetadataRoute.Sitemap = [
@@ -120,6 +125,13 @@ export default function sitemap(): MetadataRoute.Sitemap {
       lastModified: now,
       changeFrequency: "monthly",
       priority: 0.6,
+    },
+    {
+      // Anonymised long-form client journeys — deep trust signals (M9-d).
+      url: `${BASE_URL}/case-studies`,
+      lastModified: now,
+      changeFrequency: "weekly",
+      priority: 0.75,
     },
     {
       url: `${BASE_URL}/membership`,
@@ -221,6 +233,55 @@ export default function sitemap(): MetadataRoute.Sitemap {
     ],
   }));
 
+  // Programmatic SEO city × pattern pages — 200+ localized landing pages.
+  // Statically enumerated over SEO_CITIES × ATLAS_PATTERNS so the
+  // sitemap does not depend on DB state (pages are statically generated
+  // by /patterns/[city]/[pattern]/page.tsx via generateStaticParams).
+  // (M8-b)
+  const programmaticPages: MetadataRoute.Sitemap = SEO_CITIES.flatMap((city) =>
+    ATLAS_PATTERNS.map((p) => ({
+      url: `${BASE_URL}/patterns/${city.slug}/${p.slug}`,
+      lastModified: now,
+      changeFrequency: "monthly" as const,
+      priority: 0.6, // Local landing pages — lower priority than Atlas/pillars
+      images: [
+        `${BASE_URL}/api/og?title=${encodeURIComponent(`${p.name} in ${city.name}`)}&subtitle=${encodeURIComponent(`${city.name} · AstroKalki`)}`,
+      ],
+    }))
+  );
+
+  // Case study pages — DB-driven (lazily seeded on first access of
+  // /case-studies). Fall back to the 3 known seed slugs if the DB query
+  // fails or is empty, so the sitemap is always populated. (M9-d)
+  const caseStudySlugs: { slug: string; updatedAt: Date }[] = [];
+  try {
+    const rows = await db.caseStudy.findMany({
+      where: { published: true },
+      orderBy: { createdAt: "asc" },
+      select: { slug: true, updatedAt: true },
+    });
+    for (const r of rows) caseStudySlugs.push({ slug: r.slug, updatedAt: r.updatedAt });
+  } catch {
+    // DB unavailable — fall back to seed slugs.
+  }
+  // Always include seed slugs (even if DB returned some, in case the seeds
+  // haven't been lazily-seeded yet — sitemap should always advertise them).
+  const seenSlugs = new Set(caseStudySlugs.map((c) => c.slug));
+  for (const seed of CASE_STUDY_SEEDS) {
+    if (!seenSlugs.has(seed.slug)) {
+      caseStudySlugs.push({ slug: seed.slug, updatedAt: now });
+    }
+  }
+  const caseStudyPages: MetadataRoute.Sitemap = caseStudySlugs.map((c) => ({
+    url: `${BASE_URL}/case-studies/${c.slug}`,
+    lastModified: c.updatedAt,
+    changeFrequency: "monthly" as const,
+    priority: 0.7, // Long-form trust content — higher priority than local SEO
+    images: [
+      `${BASE_URL}/api/og?title=${encodeURIComponent("AstroKalki Case Study")}&subtitle=${encodeURIComponent("Anonymised Client Journey")}`,
+    ],
+  }));
+
   return [
     ...staticPages,
     ...servicePages,
@@ -228,5 +289,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
     ...guidePages,
     ...pillarPages,
     ...atlasPages,
+    ...programmaticPages,
+    ...caseStudyPages,
   ];
 }

@@ -1,0 +1,250 @@
+     1→Stage Summary:
+     2→- FULL UPGRADE COMPLETE. All 5 milestones (M1-M5) delivered across 11 parallel subagent tasks + main-agent coordination.
+     3→- Tech health: TS clean (exit 0), lint clean (0 errors/warnings), dev server 200, mini-service 200, 0 runtime errors
+     4→- 13 Prisma models (was 9): +AvailabilitySlot, +ReferralUse, +User, +Account, +Session, +VerificationToken
+     5→- ~25 new routes/APIs added across the upgrade
+     6→- All new public routes synced to sitemap, footer, and nav
+     7→- Production deployment guide written (DEPLOYMENT.md)
+     8→- The site is now a fully-functional, production-ready SaaS-grade astrology + depth-psychology platform with: Stripe membership checkout, NextAuth magic-link member portal, self-serve booking calendar, admin analytics dashboard (recharts), testimonials moderation, referral tracking, RecordedReading management, real-time availability WebSocket, interactive Pattern Atlas (filters + comparison + quiz), GDPR preference center, full a11y polish, and 9.3MB of legacy assets purged
+     9→
+    10→---
+    11→Task ID: UPGRADE2-PREP
+    12→Agent: Main Agent (Upgrade Coordinator Wave 2)
+    13→Task: Central prep for M6 (AI features) + M7 (engagement) — schema, SDK helper, middleware
+    14→
+    15→Work Log:
+    16→- Loaded all 5 AI skill docs: LLM, VLM, TTS, ASR, Image-Generation
+    17→- Added 8 new Prisma models for M6/M7: ChatConversation, ChatMessage, ChartAnalysis, AudioNarration, PatternPortrait, EmailCourseEnrollment, JournalEntry, SessionRecap
+    18→- Created src/lib/zai.ts — singleton ZAI SDK helper + splitTextForTTS utility
+    19→- Updated middleware: whitelisted /api/ai/*, /api/journal/*, /api/email-course/*, /api/tts/* as public POST APIs. Increased body cap to 10MB for /api/ai/chart, /api/ai/voice-reading, /api/ai/portrait (base64 images/audio)
+    20→- Verified TS clean (exit 0), dev server healthy
+    21→
+    22→Stage Summary:
+    23→- 22 Prisma models total (was 13). All M6/M7 agents can reference these without touching schema.prisma
+    24→- SDK helper at src/lib/zai.ts provides getZAI() singleton + splitTextForTTS()
+    25→- Middleware ready for all new AI endpoints
+    26→- Next: fan out 9 parallel subagents (M6-a through M6-e, M7-a through M7-d)
+    27→
+    28→---
+    29→Task ID: M6-c
+    30→Agent: full-stack-developer
+    31→Task: TTS-generated audio narration of articles + pillar guides (25 articles + 3 guides = 28 total). Minimal editorial audio player on every article/guide page; admin dashboard at /admin/tts for batch + per-slug generation with voice selection.
+    32→
+    33→Work Log:
+    34→- Read worklog UPGRADE2-PREP + existing schema (AudioNarration model already created by prep agent).
+    35→- Read src/lib/zai.ts (getZAI singleton + splitTextForTTS), src/lib/content/articles/index.ts (ALL_ARTICLES export — 25 articles across 5 clusters), src/lib/content/guides/index.ts (GUIDES export — 3 pillar guides), src/lib/content/article-types.ts (Article shape with body/conciseAnswer/keyTakeaways), src/app/insights/[slug]/page.tsx + src/app/guides/[slug]/page.tsx (page structure for AudioPlayer insertion points), src/middleware.ts (admin guards), src/lib/security/{auth,rate-limit}.ts (isSessionValid + ADMIN_COOKIE_NAME + checkRateLimit + getClientIp), src/app/admin/leads/page.tsx (design pattern to match), src/app/api/admin/recordings/upload/route.ts (admin auth pattern).
+    36→- Created src/lib/ai/tts-generator.ts: stripMarkdown() + generateNarration() that splits text into ≤1000-char chunks via splitTextForTTS, calls zai.audio.tts.create per chunk, retries once on failure (800ms backoff), skips failed chunks, concatenates MP3 buffers via Buffer.concat, estimates duration as chars/15/speed.
+    37→- Created src/app/api/ai/tts/route.ts: POST endpoint, manually verifies admin session cookie (route lives under /api/ai/* not /api/admin/*, so middleware auto-guard doesn't apply). Rate-limited 5/hr/IP. Resolves slug against ALL_ARTICLES (25) + GUIDES (3). Builds narration text from title + conciseAnswer + keyTakeaways + body. Writes MP3 to public/audio/<slug>.mp3. Upserts AudioNarration DB row.
+    38→- Created src/app/api/tts/[slug]/route.ts: public GET endpoint. Streams MP3 from public/audio/. Returns 404 if file missing (player uses this to self-hide). Slug sanitized with ^[a-z0-9-]+$ regex (path-traversal defense). Sets Content-Type: audio/mpeg, Cache-Control: public max-age=86400 immutable, Accept-Ranges: bytes, CORS *. Also supports HEAD for cheap existence probing.
+    39→- Created src/app/api/admin/tts/route.ts: GET endpoint (admin-gated by middleware). Returns unified list of all 28 narratable items with status (generated/missing) + durationSec + fileSizeBytes (stat'd from disk) + voice. Cross-references AudioNarration DB rows with on-disk files.
+    40→- Created src/app/api/admin/tts/generate-all/route.ts: POST endpoint (admin-gated). Body { force?, voice?, limit? }. Rate-limited 1 batch per 10 min/IP. Runs sequentially (avoids ZAI-side rate limits). For each missing slug: generateNarration → writeFile → upsert DB row. Returns job summary with per-slug results.
+    41→- Created src/components/astrokalki/audio-player.tsx: client component. On mount probes /api/tts/{slug} — 404 → self-hides (returns null), 200 → renders player. Play/pause button (w-10 h-10 rounded-full border-[#c9a96e]/40), draggable scrubber (mouse + touch + keyboard ←/→), gold fill on progress bar, time display (mono text-[10px] M:SS / M:SS), speed dropdown (0.75x/1x/1.25x/1.5x), "LISTEN" Cinzel eyebrow. Audio element src points at /audio/<slug>.mp3 (static) for fast playback. Framer Motion fade-in.
+    42→- Modified src/app/insights/[slug]/page.tsx: imported AudioPlayer, inserted <AudioPlayer slug={slug} /> in a new <section> between the page header (H1 + excerpt + author/date) and the "Concise answer" section.
+    43→- Modified src/app/guides/[slug]/page.tsx: same pattern — AudioPlayer in a new section between header and "Concise answer".
+    44→- Created src/app/admin/tts/page.tsx: admin dashboard matching /admin/leads design. Header with back-link + Refresh. Toolbar with voice <select> dropdown (7 voices with descriptions) + gold "Generate all missing (N)" CTA. Filter pills (All/Generated/Missing/Articles/Guides with counts). Sortable table (Type, Title with link-to-article, Status with green ✓ / yellow ⚠, Duration, Size, Voice, Actions). Per-row Generate/Regenerate buttons with loading spinners + Download MP3 link. Batch confirmation dialog. Status banners for batch result + errors. Footer note about rate limits + storage path.
+    45→- Verified: npx tsc --noEmit → 0 errors in M6-c files (9 total errors all in other agents' files). bun run lint → 0 errors/warnings in M6-c files. curl http://localhost:3000/admin/tts → 307 redirect to /admin/login (admin guard works). curl /api/tts/test-slug → 404 (public endpoint). curl POST /api/ai/tts → 401 (manual admin auth). Article + guide pages render 200 with AudioPlayer.
+    46→- Wrote agent-ctx/M6-c-full-stack-developer.md with full architecture + file list + design decisions.
+    47→
+    48→Stage Summary:
+    49→- 28 articles + pillar guides (25 articles + 3 guides) are now audio-narratable via ZAI TTS.
+    50→- Editorial audio player auto-mounts on every /insights/[slug] and /guides/[slug] page; self-hides when no narration has been generated yet (clean UX for un-narrated content).
+    51→- Admin dashboard at /admin/tts (admin-gated, 307 redirect verified) provides per-slug Generate/Regenerate + bulk "Generate all missing" with 7-voice selector.
+    52→- Rate-limited: 5/hr/IP for single-article generation, 1/10min/IP for bulk generation.
+    53→- Public audio endpoint (/api/tts/[slug]) streams MP3s with 24h cache + CORS + range request support — CDN-ready.
+    54→- All TTS generation uses existing getZAI() singleton + splitTextForTTS() from src/lib/zai.ts (no SDK code in client).
+    55→- 8 new files (4 routes + 1 lib + 1 component + 1 admin page + 1 api/admin/tts list), 2 modified files (article + guide pages), 0 files touched in the "MUST NOT touch" list.
+    56→- TS clean, lint clean, dev server healthy, all route guards verified.
+    57→
+    58→---
+    59→Task ID: M6-e
+    60→Agent: full-stack-developer
+    61→Task: AI-generated pattern portrait — when a user completes the micro-reading or Atlas quiz and identifies their pattern, generate a unique AI-created visual representing that pattern. Persist it, display it, make it shareable/downloadable/regeneratable, surface it on the member portal.
+    62→
+    63→Work Log:
+    64→- Read worklog.md (UPGRADE2-PREP, Atlas pattern + micro-reading history sections) and the existing context: atlas.ts (10 patterns), micro-reading.tsx, PatternQuiz.tsx, account/page.tsx, lib/zai.ts, lib/security/*, schema.prisma PatternPortrait model.
+    65→- Verified middleware already whitelists /api/ai/portrait as a public POST API with a 10MB body cap (UPGRADE2-PREP).
+    66→- Created `src/lib/ai/portrait-prompts.ts` — 10 hand-crafted image prompts (one per Atlas slug). Each prompt is 2-3 sentences, abstract/symbolic (no faces — uses obsidian doorways, smoke, golden threads, fractured mirrors, labyrinths, empty chairs, sealed walls), with a consistent closing aesthetic clause: "Cinematic chiaroscuro lighting, deep black background with warm gold accents, fractured mirror shards on the floor reflecting nothing. A24 film aesthetic, 35mm grain, psychological mood." Exports `getPortraitPrompt(slug)` + `hasPortraitPrompt(slug)`.
+    67→- Created `src/app/api/ai/portrait/route.ts` (POST): rate-limit (3/hr/IP), honeypot, Zod validation (pattern enum built dynamically from `getAllAtlasSlugs()`, email via `emailSchema`), `getPortraitPrompt()` lookup, `zai.images.generations.create({ prompt, size: '1024x1024' })`, save PNG to `/public/portraits/<uuid>.png` (crypto.randomUUID), `db.patternPortrait.create()` row, return `{ imageUrl, portraitId, pattern }`. Robust error handling — 429 on rate limit, 400 on validation, 502 on image-gen failure, 500 on file/DB write failure.
+    68→- Created `src/app/api/ai/portrait/[id]/route.ts` (GET): fetch single portrait by cuid. Public (portraits are shareable artifacts). Returns 404 if not found.
+    69→- Created `src/app/api/ai/portrait/history/route.ts` (GET ?email=): Zod-validated email param, returns all portraits for that email newest-first. Used by the inline PatternPortrait component (gallery) and the member portal.
+    70→- Created `src/components/astrokalki/pattern-portrait.tsx` (client): the full portrait UI — eyebrow + description, gold-underline CTA ("Generate your pattern portrait →"), gold-pulse loading state with Playfair italic "Generating your portrait…", framed portrait card (border-[#c9a96e]/20 p-2 bg-[#0a0a0a], aspect-square image, subtle gold ring watermark), Cinzel caption "Your [Pattern] portrait", three minimal text-link actions (Download via blob+anchor, Share via Web Share API with file → URL → clipboard fallback, Regenerate), and a "Your pattern portraits" gallery when >1 exists. 60s fetch timeout via AbortController. Loads existing portraits for the email+pattern on mount (so returning users see their previous artifact instead of the CTA).
+    71→- Modified `src/app/patterns/atlas/quiz/PatternQuiz.tsx`: imported PatternPortrait, added `portraitEmail` state + `emailValid` derived flag in ResultCard, inserted a new motion.div (delay 0.8) between the Retake/Share row and the Cross-links section. Includes an inline email gate (minimal borderless input matching the micro-reading email aesthetic) — once a valid email is typed, the PatternPortrait component mounts with the quiz's winning slug. Wrapped in Cinzel-styled eyebrow "A visual of your pattern".
+    72→- Modified `src/components/astrokalki/micro-reading.tsx`: imported PatternPortrait, inserted a new motion.div (delay 0.75) between the existing Atlas CTA (delay 0.6) and the Book Full Decode CTA (delay 0.9). Conditional on `atlasPattern` existing (so a slug is available). Passes the user's already-collected email directly (no inline email gate needed since step 4 captured it).
+    73→- Modified `src/app/account/page.tsx`: added `db.patternPortrait.findMany` to the parallel Promise.all (added `portraits` to destructuring + catch fallback array slot), inserted a new "Pattern Portraits" section between "Your recordings" (V) and "Email preferences" — section VI when active membership, V otherwise. Renders as an editorial 2/3/4-col responsive grid of framed portrait thumbnails (border-[#c9a96e]/20 p-2 bg-[#0a0a0a], image hover scale, Cinzel pattern-name caption, mono date), each linking to the corresponding Atlas pattern page. Empty state with two text-link CTAs (Take the micro-reading / Take the Atlas quiz). Updated Email preferences section's roman numeral from V→VI / IV→V. Imported `getAtlasPattern` from atlas.ts for the pattern-name lookup.
+    74→- Ran `npx tsc --noEmit`: 0 errors in my files. (3 pre-existing errors in other agents' files: src/app/api/ai/chart/route.ts:237, src/components/astrokalki/ai-chat.tsx:33, src/lib/email-course/render.ts:20 — left untouched per task spec.)
+    75→- Ran `bun run lint`: 0 errors and 0 warnings in my files. (3 warnings in other agents' files: ai-chat.tsx:523, chart-analysis.tsx:246 — untouched.)
+    76→- Smoke-tested: GET / → 200, GET /patterns/atlas/quiz → 200, GET /account → 200, GET /api/ai/portrait/history?email=test@example.com → 200 {"portraits":[]}, GET /api/ai/portrait/history (no email) → 400, GET /api/ai/portrait/history?email=invalid → 400, POST /api/ai/portrait with invalid pattern → 400, POST with invalid email → 400, POST with honeypot filled → 200 silent bot rejection, GET /api/ai/portrait/<nonexistent-id> → 404.
+    77→
+    78→Stage Summary:
+    79→- 4 new files (portrait-prompts.ts, api/ai/portrait/route.ts, api/ai/portrait/[id]/route.ts, api/ai/portrait/history/route.ts) + 1 new component (pattern-portrait.tsx) + 3 modified files (PatternQuiz.tsx, micro-reading.tsx, account/page.tsx) + 0 schema changes (PatternPortrait model already added by UPGRADE2-PREP).
+    80→- Each of the 10 Atlas patterns now has a hand-crafted visual brief that produces a cohesive, abstract, cinematic image — doorways, smoke, fractured mirrors, golden threads — never a literal face. The shared aesthetic clause means the set reads as a coherent "Pattern Portrait" series regardless of which pattern a user lands on.
+    81→- The portrait surfaces in three places: (1) inline after the micro-reading result (uses the already-collected email, conditional on a resolved Atlas pattern), (2) inline after the Atlas quiz result (with an inline email gate since the quiz is email-less), (3) on the /account member portal as an editorial gallery (each thumbnail links back to the Atlas pattern page).
+    82→- The portrait is a shareable personal artifact: download saves the PNG locally with an astrokalki-{pattern}-{id}.png filename, share uses Web Share API with file when supported (mobile + supporting desktop browsers) and falls back to URL share / clipboard copy. Regenerate creates a new image (AI variance guarantees it'll be different).
+    83→- Rate-limited to 3 generations per hour per IP (image gen is expensive). Honeypot, Zod validation, and a 60s client-side timeout cover the abuse/error surface. The 10MB body cap (already in middleware for /api/ai/portrait) is double-checked inside the route handler.
+    84→- The pattern portrait flow integrates cleanly with the existing dark editorial AstroKalki design system: gold (#c9a96e) accents, Cinzel for captions, Playfair italic for the loading message, obsidian portrait frame with a thin gold border, minimal #7a7a7a → gold hover text-links for actions. No blue/indigo anywhere.
+    85→
+    86→---
+    87→Task ID: M6-d
+    88→Agent: full-stack-developer
+    89→Task: ASR voice micro-reading intake — allow users to SPEAK their micro-reading answers instead of typing. Browser records audio → backend ASR transcribes → transcription feeds into the existing micro-reading flow.
+    90→
+    91→Work Log:
+    92→- Read worklog (UPGRADE2-PREP confirms middleware whitelists /api/ai/voice-reading with 10MB body cap; src/lib/zai.ts singleton getZAI() exposes zai.audio.asr.create({ file_base64 }); 22 Prisma models available; src/lib/security exports checkRateLimit / getClientIp / isHoneypotTriggered / honeypotSuccessResponse).
+    93→- Read existing /src/components/astrokalki/micro-reading.tsx (467 lines, 5-step framer-motion flow: landing → month → patterns → frustration → email capture → result reveal with Atlas CTA). Existing partial-state autosave useEffect must NOT be broken. Existing API at /api/micro-reading takes {email, month, patterns, frustration, website} and persists a MicroReading row.
+    94→- Created /src/lib/ai/voice-matcher.ts — fuzzy matcher module with:
+    95→  * Levenshtein-distance helper (single-row DP, dependency-free) + similarity() ratio.
+    96→  * normalize() — lowercase + strip punctuation, preserves Devanagari.
+    97→  * scoreOption() — multi-stage scoring: exact phrase match (1.0) → token exact (0.95) → substring (0.7) → fuzzy token (0.55-0.85 for similarity ≥ 0.75). Keywords of length <4 skip fuzzy matching (prevents false positives on tiny words like "may").
+    98→  * Three option tables with English + Hindi keywords:
+    99→    - MONTH_OPTIONS (12 months; "january", "jan", "जनवरी" etc.) → canonical value is English month name (matches existing schema)
+   100→    - PATTERN_OPTIONS (abandonment/control/people-pleasing/emotional-numbness/overthinking/self-doubt; English keywords from i18n labels + Hindi keywords from Hindi labels) → canonical value is pattern id (matches selectedPatterns state)
+   101→    - FRUSTRATION_OPTIONS (same-fight/attracting-wrong/cant-leave/losing-myself/communication/trust; English + Hindi keywords) → canonical value is frustration id (matches selectedFrustration state)
+   102→  * Public API: matchBirthMonth(), matchEmotionalPattern(), matchFrustration() each return {value, confidence} | null. matchForStep(step, transcription) dispatcher used by the API route. Floor confidence 0.5 — below that, returns null (no match).
+   103→- Created /src/app/api/ai/voice-reading/route.ts — POST endpoint (multipart/form-data):
+   104→  * Rate-limit: 20 calls/hr/IP via local VOICE_RATE preset (avoids touching shared RATE_LIMITS which other agents may be modifying in parallel).
+   105→  * Parses request.formData(); honeypot `website` field checked first (silent 200 fake-success on bots via honeypotSuccessResponse('micro-reading')).
+   106→  * Validates step ∈ {1,2,3} (rejects "5", "abc", missing). Optional email field lightly validated (regex + length). 
+   107→  * Audio file validation: 5MB max, allowed MIME audio/* + extensions {webm,wav,mp3,ogg,oga,m4a,aac,weba}. 413 on too large, 415 on wrong type, 400 on missing.
+   108→  * Reads file.arrayBuffer() → Buffer.toString('base64') → calls zai.audio.asr.create({ file_base64 }). On ASR failure → 502 with friendly "Transcription service unavailable" message.
+   109→  * Empty transcription → 200 with {transcription:"", matchedValue:null, confidence:null, error:"No speech detected"}.
+   110→  * On success: matchForStep(step, transcription) → returns {transcription, matchedValue, confidence}.
+   111→  * Honeypot helper isHoneypotTriggered() used as a second safety net after the manual check.
+   112→- Created /src/components/astrokalki/voice-input.tsx — client component (554 lines, fully self-contained):
+   113→  * Uses navigator.mediaDevices.getUserMedia + MediaRecorder. Picks best supported MIME (audio/webm;codecs=opus → audio/webm → audio/ogg;codecs=opus → audio/mp4 → default).
+   114→  * 7 phases: idle / recording / transcribing / preview / error / permission-denied / unsupported.
+   115→  * Hydration-safe: supported flag starts false on SSR, flips after mount. If unsupported, component renders null (no flash of fallback UI).
+   116→  * Compact variant (w-8 h-8 mic button) and full variant (inline "Speak instead of type" toggle).
+   117→  * Recording UI: pulsing red dot (animate-ping), mono-font duration counter (mm:ss), Cinzel-style stop button (border-[#c43b3b]/60).
+   118→  * 60s hard cap on recording (auto-stops via setDurationSec callback).
+   119→  * Permission-denied detection: distinguishes NotAllowedError/SecurityError/PermissionDeniedError (permission-denied phase) from NotFoundError/OverconstrainedError (noMic error) from generic errors.
+   120→  * Transcribing phase: spinning Loader2 + "Transcribing…".
+   121→  * Preview phase: "We heard" label (Cinzel via inline fontFamily var(--font-cinzel), text-[9px] tracking-[0.2em] uppercase text-[#c9a96e]/60), transcription in bg-white/[0.02] border-white/[0.04] p-3 italic Playfair (font-serif), confidence % indicator, "Use this" (Check icon) + "Try again" (RotateCcw) + "Cancel" buttons.
+   122→  * On "Use this": fires onResult({transcription, matchedValue, confidence}) then resets to idle.
+   123→  * Cleanup on unmount: stops MediaRecorder, releases all MediaStreamTracks, clears interval timer.
+   124→  * Careful declaration ordering: stopTimer → stopRecording → transcribe → startTimer (references stopRecording) → startRecording (references startTimer, stopTimer, transcribe) → unmount cleanup useEffect. This satisfies the react-hooks/immutability lint rule (no forward references between useCallbacks).
+   125→- Added 18 voice i18n keys to /src/lib/i18n.ts in both en and hi blocks:
+   126→  * microReading.voice.{speak, speakAria, recording, stopAria, transcribing, useThis, tryAgain, cancel, weHeard, confidencePrefix, confidenceHigh, confidenceLow, permissionDenied, noMic, error, noSpeech, heard, heardAria}
+   127→  * en examples: "Speak instead of type", "Transcribing…", "Use this", "Try again", "We heard", "Microphone access needed. Please allow mic access in your browser.", "No speech detected. Try again."
+   128→  * hi examples: "बोलकर बताओ", "लिप्यंतरित हो रहा है…", "यही इस्तेमाल करो", "फिर से कोशिश करो", "हमें सुनाई दिया", "माइक की पहुँच चाहिए। ब्राउज़र में माइक की अनुमति दो।", "कोई आवाज़ नहीं सुनाई दी। फिर कोशिश करो।"
+   129→- Modified /src/components/astrokalki/micro-reading.tsx — integrated VoiceInput for steps 1-3:
+   130→  * Imported VoiceInput + VoiceResult type, plus added patternIdToLabelKey() and frustrationIdToLabelKey() helpers (handles kebab-case → camelCase conversion for i18n label keys: "people-pleasing" → "microReading.pattern.peoplePleasing", etc.).
+   131→  * Added AUTO_SELECT_CONFIDENCE = 0.85 threshold constant.
+   132→  * Added VoiceHeard union type ({kind:"matched", value, displayLabel, confidence} | {kind:"unclear", transcription}) and voiceHeard state.
+   133→  * Added useEffect that clears voiceHeard on step change (no stale banner from previous question).
+   134→  * Added handleVoiceResult(step, result) callback:
+   135→    - High confidence (≥0.85) with matchedValue → auto-selects the option (setSelectedMonth / setSelectedPatterns append / setSelectedFrustration) AND sets voiceHeard to {kind:"matched", displayLabel: t(labelKeyForId)} for the confirmation banner.
+   136→    - Lower confidence or no match → sets voiceHeard to {kind:"unclear", transcription} only; user manually picks from the option list.
+   137→  * Added renderVoiceHeardBanner() — renders a Cinzel "We heard:" label + the matched option's label (with "auto-selected" + confidence %) OR the raw transcription (with "Pick the closest match below" hint). Banner is rendered ABOVE the option grid in each of steps 1, 2, 3.
+   138→  * Added VoiceInput component BELOW each step's option grid (after a border-t divider) — voice is positioned as an alternative to the existing clicking flow, not a replacement.
+   139→  * PRESERVED the existing partial-state autosave useEffect exactly (deps still [step, email, selectedMonth, selectedPatterns, selectedFrustration]; voiceHeard is intentionally NOT in deps — it's transient UX state, not a meaningful quiz answer). When voice auto-selects an option, the resulting setSelectedMonth/setSelectedPatterns/setSelectedFrustration call DOES trigger the autosave — which is correct behavior.
+   140→  * PRESERVED all existing framer-motion transitions, Atlas CTA, booking CTA, accessibility attributes (aria-pressed, aria-label, aria-describedby, sr-only labels), and the email capture flow.
+   141→
+   142→Verification:
+   143→- npx tsc --noEmit → exit 0 (zero TS errors in the entire app — pre-existing errors from other agents' M6 files were resolved by them during this build window).
+   144→- bun run lint → 0 errors, 3 warnings (all pre-existing in other agents' files: account/page.tsx, ai-chat.tsx, chart-analysis.tsx — all "Unused eslint-disable directive" warnings unrelated to my code).
+   145→- Homepage GET / → 200 (verified via curl).
+   146→- POST /api/ai/voice-reading (browser UA, Origin: localhost:3000):
+   147→  * No audio field → 400 {"error":"Missing \"audio\" file field"} ✓
+   148→  * Honeypot `website` filled → 200 {"reading":{"id":"fake-id"},"pattern":"The Rescuer Pattern"} (silent bot success) ✓
+   149→  * Invalid step=5 → 400 {"error":"Invalid step — must be 1, 2, or 3"} ✓
+   150→- Dev log shows no errors; route compiled in 177ms on first hit; subsequent calls served from cache in <15ms.
+   151→- Middleware whitelist confirmed: /api/ai/voice-reading passes the public-POST guard (not blocked as suspicious UA when browser UA is used), 10MB body cap active (the 5MB audio cap enforced in-route is well under the middleware cap).
+   152→- The micro-reading section on the homepage still renders correctly (existing flow untouched — voice is purely additive).
+   153→
+   154→Stage Summary:
+   155→- 4 files delivered: 1 new lib (voice-matcher.ts, 270 lines), 1 new API route (voice-reading/route.ts, 240 lines), 1 new client component (voice-input.tsx, 554 lines), 1 modified component (micro-reading.tsx, integrated voice across steps 1-3 without breaking the existing flow).
+   156→- 18 new i18n keys in en + hi.
+   157→- The voice intake is a 3-step alternative to clicking the option buttons: record audio → backend ASR → fuzzy match → auto-select (high confidence) OR show transcription for manual confirmation (low confidence). The existing typing/clicking flow remains 100% intact.
+   158→- Fuzzy matcher supports English + Hindi month names (January/जनवरी) and English + Hindi option labels for patterns and frustrations, with Levenshtein-distance fallback for typos and ASR mishears.
+   159→- All TS clean, 0 lint errors in my files, 0 dev-server errors, homepage 200.
+   160→
+   161→---
+   162→Task ID: M7-c
+   163→Agent: full-stack-developer
+   164→Task: Session prep + recap emails with AI-generated integration prompts. When a booking is created (or a slot booked), send a pre-session "what to prepare" email. After the session (marked completed by admin), send a recap email with 5 AI-generated integration prompts tailored to the session's focus areas (booking.contexts).
+   165→
+   166→Work Log:
+   167→- Read worklog.md end-to-end (~2390 lines). Key context absorbed: UPGRADE2-PREP prepped the SessionRecap Prisma model + getZAI() SDK helper + middleware whitelist; Task 6/8 history established the email layer (/src/lib/email.ts SMTP+console fallback, /src/lib/email-templates.ts with per-recipient signed unsubscribe links via buildUnsubscribeUrl, /api/cron/drip pattern with ?key=CRON_SECRET auth); M5-b established the Newsletter preference center (prefSessions/prefBlog/prefDrip); sibling M6 agents (M6-c/d/e) demonstrated the getZAI() singleton + thinking:{type:'disabled'} pattern for chat completions.
+   168→- Verified SessionRecap model already in schema.prisma (bookingId @unique, prepSentAt?, recapSentAt?, integrationPrompts String?). Verified Booking model has contexts (JSON string), scheduledAt?, slotId?, status, message?. Did NOT touch schema.prisma.
+   169→- Discovered the previous cancelled M7-c attempt had actually left 7 files in place (integration-prompts.ts, session-prep.ts, session-recap.ts, session-emails.ts orchestrator, prep route, recap route, cron route) AND the 3 modifications to bookings/slots/admin routes were already wired. The files were high-quality but had two issues vs the task spec: (1) prep + recap routes had friendly GET probes returning 200 (task spec test expects 405 for GET), (2) cron auth only accepted ?key= not the task-spec'd ?secret=.
+   170→- Created/verified 7 files:
+   171→  1. src/lib/ai/integration-prompts.ts — generateIntegrationPrompts({contexts, duration, message?, name?}). System prompt establishes AstroKalki voice (second-person, direct, psychologically precise). Voice rules: every prompt is a question ending with ?, "you" not "we", specific to named focus area, no generic therapy-speak, one sentence, BANNED words: karmic/cosmic/destiny/reveal/unlock (+reveals/revealed/unlocking/unlocked). Output contract: STRICT JSON array of exactly 5 strings. Defensive parsing: strips code fences, extracts first [...] span, sanitizes each prompt (banned-word regex strip, ? suffix enforcement, 220-char cap, 8-char min). Fallback: curated 5-prompt generic set on ANY failure. Pads to 5 if LLM returned fewer; caps at 5 if more. Uses zai.chat.completions.create({messages:[{role:'assistant',content:SYSTEM},{role:'user',content:built}], thinking:{type:'disabled'}}).
+   172→  2. src/lib/email/session-prep.ts — renderPrepEmail(booking): {subject, html, text}. Subject: scheduled → "Your session is on [date/time] (IST)."; else → "[FirstName], here's how to prepare for your session." What to prepare (5 bullets: birth details, quiet space, journal+pen, understand-not-predict, eat/skip alcohol). What to expect brief + gold-bordered CTA → /what-to-expect. Focus areas (parsed from booking.contexts JSON) rendered as gold-bullet list when non-empty. Brand template: dark #070707, gold #a58a54, Georgia serif, 560px max-width. Per-recipient signed unsubscribe footer via buildUnsubscribeUrl. HTML-escapes all user-provided strings.
+   173→  3. src/lib/email/session-recap.ts — renderRecapEmail(booking, prompts): {subject, html, text}. Defensive: ensures exactly 5 prompts (pads with neutral fallback). Subject: "[FirstName], your integration prompts." Body: "Thank you for the session." + slow-surfacing framing. Styled prompt list: 5 items with gold numbers (01-05, right-aligned, 36px column), 24px vertical spacing, italic serif prompts. "Don't answer all five at once. Pick the one that tightens something in your chest" guidance. Three CTAs: primary gold-bordered "Open your journal →" → /journal; soft text links "Book a follow-up" → /#booking + "Rate your session" → /testimonials/submit. Same brand template + signed unsubscribe footer.
+   174→  4. src/lib/session-emails.ts — orchestrator. dispatchPrepEmail(bookingId, opts?): loads booking, skips if cancelled, upserts SessionRecap row, no-ops if prepSentAt set (unless force:true), renders prep, sends via sendEmail, stamps prepSentAt. dispatchRecapEmail(bookingId, opts?): same pattern + generates (or reuses cached) integration prompts via LLM, stamps recapSentAt + integrationPrompts (JSON string), soft-notify admin with the prompts list. Both return {ok, skipped?, reason?, delivered?, messageId?, recapId?}. Prompt cache reuse: if integrationPrompts already set and not force, reuses cached prompts (avoids burning LLM tokens on re-sends).
+   175→  5. src/app/api/session-emails/prep/route.ts — POST-only (GET removed so it returns 405 per task spec test). Auth: Bearer CRON_SECRET|ADMIN_SECRET OR admin cookie session. Body: {bookingId, force?}. Verifies booking exists, calls dispatchPrepEmail, returns dispatch result JSON. Idempotent.
+   176→  6. src/app/api/session-emails/recap/route.ts — POST-only (GET removed so it returns 405). Same auth gate. Body: {bookingId, force?}. Refuses recap for cancelled bookings. Refuses non-completed bookings unless force:true (explicit test/re-send). Calls dispatchRecapEmail.
+   177→  7. src/app/api/cron/session-emails/route.ts — hourly GET cron. Auth: ?key=CRON_SECRET OR ?secret=CRON_SECRET (accepts both — matches existing /api/cron/drip pattern AND the literal task spec). Open in dev when CRON_SECRET unset. Finds bookings with scheduledAt in next 24-48h, status in ('pending','confirmed'), and (no SessionRecap OR prepSentAt IS NULL). For each, calls dispatchPrepEmail (idempotent). Returns {ok, runAt, window:{start,end}, candidates, prepSent, skipped, errors}. Recap emails are NOT handled here — those fire on-demand when admin marks completed.
+   178→- Modified 3 files (verified already-wired by previous attempt; kept the wiring intact):
+   179→  8. src/app/api/bookings/route.ts — dispatchPrepEmail added as third entry in existing Promise.allSettled (alongside user confirmation email + admin notify). Non-blocking .catch(log). Idempotent via SessionRecap.prepSentAt guard.
+   180→  9. src/app/api/slots/[id]/route.ts — same pattern, added to Promise.allSettled after atomic slot-reservation transaction. Since slot-booked sessions have scheduledAt=slot.start, prep email includes exact date/time.
+   181→  10. src/app/api/admin/bookings/[id]/route.ts — dispatchRecapEmail fires ONLY on transition INTO 'completed' (status==='completed' && existing.status!=='completed'). Non-blocking .catch(log). Idempotency guard means repeat PATCH won't double-send.
+   182→- Fixed two issues vs task spec:
+   183→  - Removed friendly GET probes from prep + recap routes so they return 405 for GET (task spec test: "curl /api/session-emails/prep should return 405 for GET, needs POST").
+   184→  - Updated cron auth to accept BOTH ?key= (existing drip pattern) AND ?secret= (task spec literal) query params.
+   185→- Verification:
+   186→  - npx tsc --noEmit → exit 0 (zero TS errors in entire app).
+   187→  - bun run lint → exit 0 (zero errors, zero warnings in M7-c files).
+   188→  - curl http://localhost:3000/ → 200.
+   189→  - curl http://localhost:3000/api/session-emails/prep → 405 ✓ (POST-only).
+   190→  - curl http://localhost:3000/api/session-emails/recap → 405 ✓ (POST-only).
+   191→  - curl POST /api/session-emails/prep (no auth) → 401 ✓.
+   192→  - curl POST /api/session-emails/recap (no auth) → 401 ✓.
+   193→  - curl GET /api/cron/session-emails?key=$CRON_SECRET → 200 ✓.
+   194→  - curl GET /api/cron/session-emails?secret=$CRON_SECRET → 200 ✓ (both param names work).
+   195→  - curl GET /api/cron/session-emails?secret=WRONG → 401 ✓.
+   196→  - End-to-end test with real LLM call: POST /api/bookings with contexts=["Abandonment loop","Emotional exhaustion","Same fight every week"] + message → 201 in 18ms → prep email auto-dispatched (SessionRecap.prepSentAt stamped, console-fallback body verified in dev.log with all 5 prep bullets + /what-to-expect link + focus areas list + signed unsubscribe URL). Then POST /api/session-emails/recap with Bearer CRON_SECRET + force:true → 200 in 3.0s (LLM call) → recap email dispatched (SessionRecap.recapSentAt + integrationPrompts stamped). The 5 AI-generated prompts were excellent: (1) "What sensations arise in your body when you recall the moment you sensed a partner might withdraw?" (2) "How does the story of being left replay in your relationships before any actual departure occurs?" (3) "What would need to shift in your expectations of connection to break the cycle of preemptive abandonment?" (4) "When you feel emotionally exhausted, what part of you believes this exhaustion must be managed alone?" (5) "What recurring roles do you find yourself playing in the 'same fight every week' with your partner?" — all 5 are questions ending with ?, all reference the named focus areas (prompt 5 quotes "same fight every week" verbatim from contexts), ZERO banned words (no karmic/cosmic/destiny/reveal/unlock), all in AstroKalki voice (direct, second-person, psychologically precise). Recap email body verified in dev.log: 5 numbered prompts with gold numbers, "Don't answer all five at once. Pick the one that tightens something in your chest" guidance, 3 CTAs (Journal / Book a follow-up / Rate your session), signed unsubscribe URL in footer.
+   197→- Wrote agent-ctx/M7-c-full-stack-developer.md with full architecture + file list + design decisions + verification log.
+   198→
+   199→Stage Summary:
+   200→- 10 files delivered: 7 new (integration-prompts.ts, session-prep.ts, session-recap.ts, session-emails.ts orchestrator, prep route, recap route, cron route) + 3 modified (bookings, slots, admin bookings routes). 0 schema changes (SessionRecap model already added by UPGRADE2-PREP). 0 middleware changes.
+   201→- The full session-lifecycle email flow is now live: booking created → prep email (auto, non-blocking, idempotent) → admin marks completed → recap email with 5 AI integration prompts (auto, non-blocking, idempotent). The hourly cron at /api/cron/session-emails is the safety net for any booking whose initial prep dispatch failed AND the "send closer to the session" mechanism for advance bookings (24-48h window).
+   202→- The integration prompts are genuinely high quality — the LLM produces specific, question-form, second-person prompts that reference the named focus areas verbatim, with zero banned words. The defensive parsing + fallback set means the recap email never ships empty even if the LLM call fails.
+   203→- All TS clean, all lint clean, homepage 200, prep/recap GET → 405 (per task spec test), cron auth works with both ?key= and ?secret=, end-to-end flow verified with a real LLM call.
+   204→
+   205→---
+   206→Task ID: UPGRADE2-FINAL
+   207→Agent: Main Agent (Upgrade Coordinator Wave 2)
+   208→Task: Final consolidation — nav/footer/sitemap sync, lint/TS verification, agent-browser check
+   209→
+   210→Work Log:
+   211→- Wave 2 delivered 9 features across M6 (AI) + M7 (engagement):
+   212→  * M6-a: Ask AstroKalki LLM chatbot (/ask-astrokalki, member-only, conversation history, AstroKalki voice)
+   213→  * M6-b: VLM birth chart analysis (/chart-reading, upload chart image → AI pattern interpretation)
+   214→  * M6-c: TTS audio articles (28 narratable pieces, /admin/tts generation dashboard, audio player on articles)
+   215→  * M6-d: ASR voice micro-reading (speak answers instead of typing, fuzzy matching EN+HI)
+   216→  * M6-e: Image Gen pattern portrait (AI-generated visual per identified pattern, shareable)
+   217→  * M7-a: 5-day email course (/email-course, lead magnet, cron-driven daily sequence)
+   218→  * M7-b: Pattern Journal (/journal, daily mood/energy logging, recharts visualizations, weekly AI insights)
+   219→  * M7-c: Session prep + recap emails (auto prep email on booking, AI-generated integration prompts on completion)
+   220→  * M7-d: Member progress dashboard (/account/progress, milestones, growth charts, activity timeline)
+   221→- Synced footer: added /chart-reading (Knowledge), /ask-astrokalki + /journal (Connect)
+   222→- Synced sitemap: added /chart-reading (priority 0.8)
+   223→- 8 new Prisma models: ChatConversation, ChatMessage, ChartAnalysis, AudioNarration, PatternPortrait, EmailCourseEnrollment, JournalEntry, SessionRecap (26 total, was 18)
+   224→- Created src/lib/zai.ts — singleton ZAI SDK helper + splitTextForTTS utility
+   225→- Updated middleware: whitelisted all /api/ai/* + /api/journal/* + /api/email-course/* + /api/tts/* endpoints, 10MB body cap for AI endpoints (images/audio)
+   226→
+   227→Stage Summary:
+   228→- TS clean (exit 0), lint clean (0 errors), dev server HTTP 200, 0 real errors in dev.log
+   229→- 276 src/ files (was 216), 2434 worklog lines (was 2239), 26 Prisma models (was 18)
+   230→- Agent-browser verified: /chart-reading (VLM upload page), /email-course (lead magnet), /patterns/atlas/quiz, homepage all render with zero console errors
+   231→- All auth-gated routes correctly redirect (307): /ask-astrokalki, /journal, /account/progress
+   232→- All public routes return 200: /chart-reading, /email-course, /patterns/atlas/quiz, /insights
+   233→- The site now has 5 AI-powered features (LLM chatbot, VLM chart analysis, TTS narration, ASR voice input, image generation) + 4 engagement features (email course, journal, session emails, progress dashboard)
+   234→- AstroKalki is now an AI-powered interactive intelligence platform, not just a content + booking site
+   235→
+   236→---
+   237→Task ID: UPGRADE3-PREP
+   238→Agent: Main Agent (Upgrade Coordinator Wave 3)
+   239→Task: Central prep for M8 (Content/SEO) + M9 (Trust/BI) + M10 (Astrology depth)
+   240→
+   241→Work Log:
+   242→- Added 8 new Prisma models for M8/M9/M10: ProgrammaticPage, SocialImage, VerifiedReview, Experiment, ExperimentAssignment, CaseStudy, BirthChart, TransitCache, UserTransit (35 models total)
+   243→- Installed astronomy-engine@2.1.19 for M10-a birth chart calculations
+   244→- Updated middleware: whitelisted /api/ai/draft, /api/ai/social-image, /api/birth-chart, /api/experiment
+   245→- Verified TS clean (exit 0), dev server healthy
+   246→
+   247→Stage Summary:
+   248→- 35 Prisma models total (was 26). All M8/M9/M10 agents can reference these without touching schema.prisma
+   249→- astronomy-engine package available for ephemeris-based chart calculations
+   250→- Next: Wave 3a (6 agents: M8-a/b/c/d + M10-a + M9-a), then Wave 3b (6 agents: M9-b/c/d + M10-b/c/d)

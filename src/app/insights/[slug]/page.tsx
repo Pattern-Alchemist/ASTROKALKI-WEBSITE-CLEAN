@@ -43,6 +43,12 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 
   const cluster = CLUSTER_BY_SLUG[article.cluster];
 
+  // AI-generated social card endpoint — streams the AI PNG if one has been
+  // generated for this slug, otherwise 307-redirects to /api/og which
+  // renders the programmatic fallback poster. Either way, crawlers always
+  // get a valid OG image.
+  const socialImageUrl = `/api/ai/social-image/${slug}`;
+
   return {
     title: `${article.title} — AstroKalki`,
     description: article.metaDescription,
@@ -55,9 +61,9 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
       siteName: "AstroKalki",
       images: [
         {
-          url: `/api/og?title=${encodeURIComponent(article.title)}&subtitle=${encodeURIComponent(cluster?.title ?? "")}`,
-          width: 1200,
-          height: 630,
+          url: socialImageUrl,
+          width: 1344,
+          height: 768,
           alt: article.title,
         },
       ],
@@ -66,7 +72,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
       card: "summary_large_image",
       title: article.title,
       description: article.metaDescription,
-      images: [`/api/og?title=${encodeURIComponent(article.title)}&subtitle=${encodeURIComponent(cluster?.title ?? "")}`],
+      images: [socialImageUrl],
     },
     keywords: [
       article.targetKeyword,

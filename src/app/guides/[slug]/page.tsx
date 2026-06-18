@@ -51,6 +51,11 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 
   const keywords = [guide.targetKeyword, ...guide.secondaryKeywords];
 
+  // AI-generated social card endpoint — streams the AI PNG if one has been
+  // generated for this slug, otherwise 307-redirects to /api/og which
+  // renders the programmatic fallback poster.
+  const socialImageUrl = `/api/ai/social-image/${slug}`;
+
   return {
     title: `${guide.title} — AstroKalki`,
     description: guide.metaDescription,
@@ -63,9 +68,9 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
       siteName: "AstroKalki",
       images: [
         {
-          url: `/api/og?title=${encodeURIComponent(guide.title)}&subtitle=${encodeURIComponent("AstroKalki Guide")}`,
-          width: 1200,
-          height: 630,
+          url: socialImageUrl,
+          width: 1344,
+          height: 768,
           alt: guide.title,
         },
       ],
@@ -74,7 +79,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
       card: "summary_large_image",
       title: guide.title,
       description: guide.metaDescription,
-      images: [`/api/og?title=${encodeURIComponent(guide.title)}&subtitle=${encodeURIComponent("AstroKalki Guide")}`],
+      images: [socialImageUrl],
     },
     keywords,
     authors: [{ name: AUTHOR.name, url: `https://astrokalki.com/author/${AUTHOR.slug}` }],

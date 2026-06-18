@@ -1,12 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useState, Suspense } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import Breadcrumbs from "@/components/astrokalki/breadcrumbs";
-import { ArrowRight, CheckCircle2, AlertCircle, Loader2 } from "lucide-react";
+import { ArrowRight, CheckCircle2, AlertCircle, Loader2, BadgeCheck } from "lucide-react";
 
 /**
  * /testimonials/submit — public submission form.
@@ -18,7 +19,18 @@ import { ArrowRight, CheckCircle2, AlertCircle, Loader2 } from "lucide-react";
  *   - honeypot field "website" — bots fill it, humans never see it
  *
  * On submit → POST /api/testimonials with { quote, context, initials, email,
- * pattern?, website }.
+ * pattern?, bookingId?, website }.
+ *
+ * The testimonial is created with status='pending' regardless — admin
+ * moderation is always required. If bookingId is provided AND the booking
+ * exists + is completed + the email matches, a VerifiedReview record is
+ * created linking the testimonial to the booking. The admin sees a
+ * "Verified Session" badge in the moderation queue, signalling this is a
+ * genuine session attendee — not an anonymous submission.
+ *
+ * URL params (set by the recap email + review-request email CTAs):
+ *   - ?booking=<bookingId>   pre-fills the booking reference field
+ *   - ?email=<encoded email> pre-fills the email field
  *
  * Success state replaces the form with a quiet editorial confirmation and a
  * link back to /testimonials. Errors are surfaced inline.
@@ -63,15 +75,38 @@ const submitSchema = z.object({
   pattern: z
     .string()
     .optional(),
+  // Optional booking reference — if present + matches a completed booking
+  // owned by this email, the testimonial is auto-verified on submit.
+  bookingId: z
+    .string()
+    .trim()
+    .max(100, "Booking reference too long.")
+    .optional()
+    .or(z.literal("").transform(() => undefined)),
   // Honeypot — must remain empty. Real users never see this field.
   website: z.string().max(0).optional(),
 });
 
 type SubmitFormValues = z.infer<typeof submitSchema>;
 
-export default function SubmitTestimonialPage() {
+function SubmitTestimonialForm() {
+  const searchParams = useSearchParams();
   const [submitted, setSubmitted] = useState(false);
+  const [submittedVerified, setSubmittedVerified] = useState(false);
   const [serverError, setServerError] = useState<string | null>(null);
+
+  // ─── Pre-fill from URL params (?booking=…&email=…) ───────────────
+  // The recap email and review-request email CTAs include these params so
+  // the submit form is pre-filled with the booking reference + email,
+  // enabling the auto-verify flow (the user doesn't have to know or type
+  // their booking ID). When both params are present, we also show a
+  // banner explaining the Verified Session badge.
+  const prefilledBooking = searchParams.get("booking") || "";
+  const prefilledEmail = searchParams.get("email") || "";
+  // Show the "we're glad you had a session" banner when EITHER the booking
+  // reference OR the email came from the URL — both indicate this visit
+  // came from a session email link.
+  const showVerifiedBanner = Boolean(prefilledBooking || prefilledEmail);
 
   const {
     register,
@@ -83,8 +118,9 @@ export default function SubmitTestimonialPage() {
       quote: "",
       context: "",
       initials: "",
-      email: "",
+      email: prefilledEmail,
       pattern: "",
+      bookingId: prefilledBooking,
       website: "",
     },
   });
@@ -101,6 +137,7 @@ export default function SubmitTestimonialPage() {
           initials: values.initials,
           email: values.email,
           pattern: values.pattern || undefined,
+          bookingId: values.bookingId || undefined,
           // Honeypot — must be empty. Real users never see this field.
           website: values.website || "",
         }),
@@ -119,7 +156,12 @@ export default function SubmitTestimonialPage() {
         return;
       }
 
-      // 201 — success
+      // 201 — success. The testimonial is always 'pending' (admin moderates),
+      // but if `verified` is true, a VerifiedReview row links it to a
+      // completed booking — the admin will see a "Verified Session" badge
+      // in the moderation queue, signalling this is a genuine session
+      // attendee.
+      setSubmittedVerified(Boolean(data.verified));
       setSubmitted(true);
     } catch {
       setServerError("Network error — please retry.");
@@ -132,17 +174,25 @@ export default function SubmitTestimonialPage() {
       <main className="min-h-screen bg-[#050505] text-[#f0eee9] flex items-center justify-center px-6 py-20">
         <div className="max-w-xl w-full text-center">
           <div className="w-12 h-px bg-[#c9a96e]/40 mx-auto mb-8" />
-          <CheckCircle2 className="size-10 text-[#c9a96e]/80 mx-auto mb-8" strokeWidth={1} />
+          {submittedVerified ? (
+            <div className="inline-flex items-center gap-2 text-[#c9a96e] mb-8">
+              <BadgeCheck className="size-10" strokeWidth={1} />
+            </div>
+          ) : (
+            <CheckCircle2 className="size-10 text-[#c9a96e]/80 mx-auto mb-8" strokeWidth={1} />
+          )}
           <p className="text-[10px] tracking-[0.4em] uppercase text-[#c9a96e]/70 mb-6 font-light">
-            Received
+            {submittedVerified ? "Verified & awaiting review" : "Received"}
           </p>
           <h1 className="text-3xl sm:text-4xl font-serif font-light tracking-[-0.02em] mb-6 leading-tight">
-            Thank you. Your words are awaiting review.
+            {submittedVerified
+              ? "Thank you. Your verified testimonial is awaiting review."
+              : "Thank you. Your words are awaiting review."}
           </h1>
           <p className="text-[#9a9a9a] text-base leading-[1.8] font-light mb-10 max-w-md mx-auto">
-            Each submission is read by hand. If your pattern is selected to be
-            published, it will appear anonymously — first-initial, age, and the
-            session it followed.
+            {submittedVerified
+              ? "Because you linked your booking reference, your testimonial is marked as a Verified Session. Each submission is still read by hand — if your pattern is selected to be published, it will appear anonymously with a gold 'Verified Session' badge, alongside your first-initial, age, and the session it followed."
+              : "Each submission is read by hand. If your pattern is selected to be published, it will appear anonymously — first-initial, age, and the session it followed."}
           </p>
           <Link
             href="/testimonials"
@@ -186,6 +236,44 @@ export default function SubmitTestimonialPage() {
       </header>
 
       <div className="max-w-3xl mx-auto px-6 sm:px-10 py-16 sm:py-20">
+        {/* ─── Verified-session banner (shown when ?booking or ?email in URL) ───
+            When the visitor arrives from a recap or review-request email,
+            they land with ?booking=…&email=… in the URL. The banner lets
+            them know their testimonial will be linked to their booking and
+            (if email matches) will show a Verified badge in the moderation
+            queue. */}
+        {showVerifiedBanner && (
+          <div className="mb-12 p-5 border border-[#c9a96e]/30 bg-[#c9a96e]/[0.03] flex items-start gap-3">
+            <BadgeCheck
+              className="size-5 text-[#c9a96e] flex-shrink-0 mt-0.5"
+              strokeWidth={1.5}
+              aria-hidden="true"
+            />
+            <div className="flex-1">
+              <p className="text-[10px] tracking-[0.3em] uppercase text-[#c9a96e] mb-2 font-light">
+                Verified session
+              </p>
+              <p className="text-sm text-[#cfcabf] font-light leading-[1.7]">
+                We&rsquo;re glad you had a session with us. Your booking
+                reference is pre-filled below — if your email matches the
+                booking, your testimonial will be marked with a{" "}
+                <span className="inline-flex items-center gap-1 text-[#c9a96e] align-middle">
+                  <BadgeCheck className="size-3" strokeWidth={1.5} />
+                  <span
+                    className="text-[9px] tracking-[0.2em] uppercase"
+                    style={{ fontFamily: "Cinzel, Georgia, serif" }}
+                  >
+                    Verified
+                  </span>
+                </span>{" "}
+                badge in the moderation queue, signalling to the moderator
+                that this is a genuine session attendee. Each submission is
+                still read by hand.
+              </p>
+            </div>
+          </div>
+        )}
+
         <form onSubmit={handleSubmit(onSubmit)} noValidate className="space-y-12">
           {/* Honeypot — visually hidden, tabbable=false, autocomplete=off */}
           <div
@@ -316,6 +404,51 @@ export default function SubmitTestimonialPage() {
             </fieldset>
           </div>
 
+          {/* BOOKING REFERENCE (optional — drives Verified Session badge) */}
+          <fieldset>
+            <label
+              htmlFor="bookingId"
+              className="block text-[10px] tracking-[0.3em] uppercase text-[#7a7a7a] mb-3 font-light"
+            >
+              Booking reference{" "}
+              <span className="text-[#5a5a5a] normal-case tracking-normal">
+                (optional)
+              </span>
+            </label>
+            <p className="text-[#5a5a5a] text-xs font-light mb-4 leading-relaxed">
+              If you have a session booking ID, enter it to flag your
+              testimonial as a{" "}
+              <span className="inline-flex items-center gap-1 text-[#c9a96e] align-middle">
+                <BadgeCheck className="size-3" strokeWidth={1.5} />
+                <span
+                  className="text-[9px] tracking-[0.2em] uppercase"
+                  style={{ fontFamily: "Cinzel, Georgia, serif" }}
+                >
+                  Verified Session
+                </span>
+              </span>
+              . Verified testimonials are still read by hand, but the
+              Verified badge tells the moderator this is a genuine session
+              attendee — not an anonymous submission. Anonymous submissions
+              without a booking reference still work — they just go through
+              the moderation queue without the badge.
+            </p>
+            <input
+              id="bookingId"
+              type="text"
+              autoComplete="off"
+              placeholder="e.g. ckxxxxxxxxxxxxxxxx"
+              {...register("bookingId")}
+              className="w-full bg-transparent border-b border-white/[0.1] px-1 py-3 text-base text-[#f0eee9] focus:border-[#c9a96e] focus:outline-none transition-colors placeholder:text-[#3a3a3a] font-light font-mono"
+            />
+            {errors.bookingId && (
+              <p className="mt-2 text-xs text-red-400/80 font-light flex items-center gap-1.5">
+                <AlertCircle className="size-3" />
+                {errors.bookingId.message}
+              </p>
+            )}
+          </fieldset>
+
           {/* PATTERN */}
           <fieldset>
             <label
@@ -389,5 +522,24 @@ export default function SubmitTestimonialPage() {
         </form>
       </div>
     </main>
+  );
+}
+
+/**
+ * Default export wraps the form in <Suspense> because useSearchParams() is
+ * used inside (Next.js 16 requirement — pages using useSearchParams must be
+ * wrapped so the static-render shell can degrade gracefully).
+ */
+export default function SubmitTestimonialPage() {
+  return (
+    <Suspense
+      fallback={
+        <main className="min-h-screen bg-[#050505] text-[#f0eee9] flex items-center justify-center">
+          <Loader2 className="size-6 text-[#c9a96e]/60 animate-spin" />
+        </main>
+      }
+    >
+      <SubmitTestimonialForm />
+    </Suspense>
   );
 }

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { Metadata } from "next";
+import { BadgeCheck } from "lucide-react";
 import Breadcrumbs from "@/components/astrokalki/breadcrumbs";
 import { db } from "@/lib/db";
 
@@ -73,6 +74,7 @@ type TestimonialItem = {
   context: string;
   initials: string;
   detail?: string;
+  verified?: boolean;
 };
 
 export default async function TestimonialsPage() {
@@ -87,11 +89,22 @@ export default async function TestimonialsPage() {
       take: 12,
     });
     if (dbTestimonials.length > 0) {
+      // Fetch VerifiedReview records for these testimonial IDs in one
+      // query. There's no Prisma @relation between Testimonial and
+      // VerifiedReview (the schema was designed that way to keep
+      // Testimonial untouched), so we resolve the link here.
+      const verifiedRows = await db.verifiedReview.findMany({
+        where: { testimonialId: { in: dbTestimonials.map((t) => t.id) } },
+        select: { testimonialId: true },
+      });
+      const verifiedIds = new Set(verifiedRows.map((v) => v.testimonialId));
+
       testimonials = dbTestimonials.map((t) => ({
         quote: t.quote,
         context: t.context,
         initials: t.initials,
         detail: t.detail ?? undefined,
+        verified: verifiedIds.has(t.id),
       }));
     }
   } catch {
@@ -130,7 +143,27 @@ export default async function TestimonialsPage() {
                 &ldquo;{t.quote}&rdquo;
               </p>
               <div className="pt-4 border-t border-white/[0.04]">
-                <p className="text-[#c9a96e] text-sm font-serif font-light">{t.initials}</p>
+                <div className="flex items-center gap-3 flex-wrap">
+                  <p className="text-[#c9a96e] text-sm font-serif font-light">{t.initials}</p>
+                  {t.verified && (
+                    <span
+                      className="inline-flex items-center gap-1.5 text-[#c9a96e] border border-[#c9a96e]/40 px-2 py-0.5 rounded"
+                      title="This testimonial is from a verified session"
+                    >
+                      <BadgeCheck
+                        className="size-3"
+                        strokeWidth={1.5}
+                        aria-hidden="true"
+                      />
+                      <span
+                        className="text-[9px] tracking-[0.2em] uppercase font-light"
+                        style={{ fontFamily: "Cinzel, Georgia, serif" }}
+                      >
+                        Verified Session
+                      </span>
+                    </span>
+                  )}
+                </div>
                 <p className="text-[10px] tracking-[0.3em] uppercase text-[#5a5a5a] mt-1 font-light">
                   {t.context}
                 </p>
