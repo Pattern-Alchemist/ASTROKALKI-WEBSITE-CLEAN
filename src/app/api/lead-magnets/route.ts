@@ -142,7 +142,7 @@ export async function GET() {
     {
       id: 'karmic-loop-quiz',
       title: 'What Karmic Loop Are You Repeating?',
-      description: 'Discover the inherited pattern or karma you're unconsciously cycling through',
+      description: 'Discover the inherited pattern or karma you&apos;re unconsciously cycling through',
       questions: 18,
       time: '3 minutes',
       downloadUrl: '/api/download/karmic-loop-quiz.pdf',

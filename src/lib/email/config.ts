@@ -106,7 +106,7 @@ export async function sendEmail({
     `;
     
     const result = await transporter.sendMail({
-      from: emailConfig.defaultFrom,
+      from: `${emailConfig.defaultFrom.name} <${emailConfig.defaultFrom.email}>`,
       to,
       subject,
       html,
