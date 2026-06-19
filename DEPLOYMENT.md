@@ -1,6 +1,116 @@
-# AstroKalki — Deployment & Operations Guide
+# AstroKalki — Complete Deployment Guide
 
-This document covers everything required to take AstroKalki from dev to production.
+Production deployment with all marketing strategies, integrations, and automation systems.
+
+---
+
+## 5 Deployment Steps
+
+### ✓ STEP 1: Database Migration to Production
+
+**Current:** SQLite (development)  
+**Target:** Neon PostgreSQL (production recommended)
+
+```bash
+# 1. Create Neon project at https://neon.tech
+# 2. Copy DATABASE_URL from Neon console
+# 3. Update .env
+
+DATABASE_URL=postgresql://user:password@neon.tech/dbname
+DATABASE_PROVIDER=neon
+
+# 4. Run migrations
+npx prisma migrate deploy
+npx prisma db push
+
+# 5. Verify
+npx prisma studio
+```
+
+### ✓ STEP 2: Configure APIs & Integrations
+
+#### AI/LLM (Ask AstroKalki, Pattern Analysis)
+```bash
+# Option A: OpenAI
+OPENAI_API_KEY=sk_...
+LLM_PROVIDER=openai
+LLM_MODEL=gpt-4-turbo
+
+# Option B: Vercel AI Gateway (recommended - free)
+AI_GATEWAY_API_KEY=vck_...
+LLM_PROVIDER=vercel-ai-gateway
+```
+
+#### Image Generation (Pattern Portraits)
+```bash
+IMAGE_API_KEY=sk_...
+IMAGE_MODEL=dall-e-3
+```
+
+#### Text-to-Speech (Audio Narrations)
+```bash
+TTS_API_KEY=sk_...
+TTS_VOICE=nova
+```
+
+#### Payment Processing (Stripe)
+```bash
+STRIPE_SECRET_KEY=sk_live_...
+STRIPE_PUBLISHABLE_KEY=pk_live_...
+STRIPE_WEBHOOK_SECRET=whsec_...
+```
+
+### ✓ STEP 3: Email Infrastructure
+
+#### SMTP Configuration (Required for lead capture)
+```bash
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USER=your-email@gmail.com
+SMTP_PASSWORD=app-specific-password
+SMTP_SECURE=false
+EMAIL_FROM=hello@astrokalki.com
+```
+
+**Gmail Setup:**
+1. Enable 2FA
+2. Generate app password: https://myaccount.google.com/apppasswords
+3. Use as SMTP_PASSWORD
+
+#### Enable Drip Campaigns
+- Configured in `vercel.json`
+- Set `CRON_SECRET` for security
+- Automatically sends daily emails
+
+### ✓ STEP 4: Analytics & Tracking
+
+#### Google Analytics 4
+```bash
+NEXT_PUBLIC_GA4_MEASUREMENT_ID=G_...
+GA4_PROPERTY_ID=...
+GA4_API_SECRET=...
+```
+
+#### Event Tracking (Auto-tracked)
+- `lead_magnet_download` — Lead captured
+- `email_course_signup` — Course enrolled
+- `birth_chart_generated` — Free tool used
+- `session_booked` — Booking made
+- `session_completed` — Session completed
+
+### ✓ STEP 5: Domain & Production Launch
+
+#### DNS Records
+```
+Type    Name              Value
+A       @                 astrokalki.vercel.app
+CNAME   www               cname.vercel-dns.com
+TXT     @                 v=spf1 include:sendgrid.net ~all
+```
+
+#### SSL/TLS
+- Vercel provides free SSL automatically
+- Auto-renews every 60 days
 
 ---
 
