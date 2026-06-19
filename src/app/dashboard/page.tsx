@@ -6,6 +6,7 @@
  */
 
 import { AdaptiveDashboardGrid } from '@/components/adaptive-dashboard-grid';
+import { JourneyExportDialog } from '@/components/journey-export-dialog';
 
 export const metadata = {
   title: 'Dashboard - AstroKalki',
@@ -18,12 +19,19 @@ export default function Dashboard() {
       <div className="max-w-6xl mx-auto">
         {/* Header */}
         <div className="mb-20">
-          <p className="text-[10px] tracking-[0.5em] uppercase text-[#c9a96e]/60 mb-4 font-light">
-            Your Pattern Journey
-          </p>
-          <h1 className="text-[clamp(2rem,5vw,3.75rem)] leading-[1.05] tracking-[-0.02em] font-serif text-[#f0eee9] mb-6">
-            Dashboard
-          </h1>
+          <div className="flex items-start justify-between gap-8 mb-6">
+            <div className="flex-1">
+              <p className="text-[10px] tracking-[0.5em] uppercase text-[#c9a96e]/60 mb-4 font-light">
+                Your Pattern Journey
+              </p>
+              <h1 className="text-[clamp(2rem,5vw,3.75rem)] leading-[1.05] tracking-[-0.02em] font-serif text-[#f0eee9]">
+                Dashboard
+              </h1>
+            </div>
+            <div className="pt-2">
+              <JourneyExportDialog />
+            </div>
+          </div>
           <p className="text-[#9a9a9a] text-base leading-[1.8] max-w-2xl font-light">
             Track your psychological patterns across time. Understand when they activate, how intensely, and what planetary influences shape their appearance.
           </p>
