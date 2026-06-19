@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { useI18n } from "@/lib/i18n-context";
 
 const tierKeys = [
@@ -20,7 +21,7 @@ const tierKeys = [
     period: "one-time",
     membershipType: "single",
     popular: false,
-    icon: "👁️",
+    icon: "/images/icon-observer.png",
   },
   {
     id: "deep-work",
@@ -39,7 +40,7 @@ const tierKeys = [
     period: "/month",
     membershipType: "monthly",
     popular: true,
-    icon: "✨",
+    icon: "/images/icon-deep-work.png",
   },
 ];
 
@@ -97,7 +98,15 @@ export default function MembershipTiers() {
                 )}
 
                 {/* Icon */}
-                <div className="text-3xl mb-4">{tier.icon}</div>
+                <div className="w-20 h-20 mb-6 relative">
+                  <Image
+                    src={tier.icon}
+                    alt={tier.id}
+                    fill
+                    className="object-contain"
+                    priority={tier.popular}
+                  />
+                </div>
 
                 {/* Title */}
                 <h3 className="text-[#f0eee9] text-2xl sm:text-3xl font-serif tracking-[-0.01em] mb-3 leading-tight group-hover:text-[#c9a96e] transition-colors">

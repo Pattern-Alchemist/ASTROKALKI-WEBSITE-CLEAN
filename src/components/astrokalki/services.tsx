@@ -2,6 +2,7 @@
 
 import { useI18n } from "@/lib/i18n-context";
 import Link from "next/link";
+import Image from "next/image";
 
 const serviceKeys = [
   {
@@ -12,6 +13,7 @@ const serviceKeys = [
     duration: "20 min",
     badge: "QUICK START",
     isQuick: true,
+    icon: "/images/icon-pattern-snapshot.png",
   },
   {
     id: "relationship",
@@ -77,6 +79,15 @@ export default function Services() {
               
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-8">
                 <div>
+                  <div className="w-16 h-16 mb-4 relative">
+                    <Image
+                      src={serviceKeys[0].icon}
+                      alt="Pattern Snapshot"
+                      fill
+                      className="object-contain"
+                      priority
+                    />
+                  </div>
                   <h3 className="text-[#f0eee9] text-xl sm:text-2xl font-serif tracking-[-0.01em] mb-3 leading-tight">
                     {t(serviceKeys[0].titleKey)}
                   </h3>
