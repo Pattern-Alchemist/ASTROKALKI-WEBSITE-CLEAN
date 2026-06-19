@@ -40,6 +40,13 @@ export async function GET(request: NextRequest) {
     const fromRaw = searchParams.get('from');
     const toRaw = searchParams.get('to');
 
+    console.log('[slots API] Fetching slots', {
+      duration: durationRaw,
+      from: fromRaw,
+      to: toRaw,
+      timestamp: new Date().toISOString(),
+    });
+
     // ─── Build the where clause ───────────────────────────────────
     const where: {
       status: string;
@@ -97,11 +104,24 @@ export async function GET(request: NextRequest) {
       },
     });
 
-    return NextResponse.json({ slots });
+    console.log(`[slots API] Successfully fetched ${slots.length} slots`);
+
+    return NextResponse.json({ 
+      slots,
+      count: slots.length,
+      timestamp: new Date().toISOString(),
+    });
   } catch (error) {
-    console.error('Slots list error:', error);
+    console.error('[slots API] Error fetching slots:', {
+      error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+      timestamp: new Date().toISOString(),
+    });
     return NextResponse.json(
-      { error: 'Failed to fetch slots' },
+      { 
+        error: 'Failed to fetch slots. Please try again in a moment.',
+        timestamp: new Date().toISOString(),
+      },
       { status: 500 }
     );
   }
