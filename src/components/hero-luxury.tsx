@@ -30,35 +30,35 @@ export function HeroLuxury() {
       </div>
 
       {/* Content */}
-      <div className="relative z-10 max-w-4xl mx-auto px-6 sm:px-10 text-center">
+      <div className="relative z-10 max-w-5xl mx-auto px-6 sm:px-10 text-center flex flex-col items-center">
         {/* Luxury header text */}
-        <div className={`transition-all duration-1000 ${isLoaded ? 'opacity-100' : 'opacity-0'}`}>
+        <div className={`transition-all duration-1000 mb-8 ${isLoaded ? 'opacity-100' : 'opacity-0'}`}>
           {/* Premium overline */}
           <p className="text-xs sm:text-sm tracking-[0.4em] uppercase font-space-grotesk text-[#c9a96e]/70 mb-6 sm:mb-8">
             Pattern Recognition Through Vedic Astrology
           </p>
 
           {/* Main heading - simplified, impactful */}
-          <h1 className="font-cormorant text-5xl sm:text-6xl lg:text-7xl tracking-tight leading-[1.15] mb-4 sm:mb-6">
+          <h1 className="font-cormorant text-5xl sm:text-6xl lg:text-7xl tracking-tight leading-[1.15] mb-3 sm:mb-4">
             <span className="block text-[#e8e6e1] font-light">Same Pattern,</span>
             <span className="block text-[#c9a96e] font-normal">Different Face.</span>
           </h1>
 
           {/* Luxury divider */}
-          <div className="flex items-center justify-center gap-4 my-6 sm:my-8">
+          <div className="flex items-center justify-center gap-4 my-5 sm:my-6">
             <div className="w-8 sm:w-12 h-px bg-gradient-to-r from-transparent to-[#c9a96e]/40" />
             <div className="w-2 h-2 bg-[#c9a96e] rounded-full" />
             <div className="w-8 sm:w-12 h-px bg-gradient-to-l from-transparent to-[#c9a96e]/40" />
           </div>
 
-          {/* Elegant subheading - concise */}
-          <p className="text-sm sm:text-base text-[#b0aca5] max-w-xl mx-auto font-light leading-relaxed mb-10 sm:mb-12 font-montserrat">
+          {/* Elegant subheading - concise, positioned higher */}
+          <p className="text-sm sm:text-base text-[#b0aca5] max-w-xl mx-auto font-light leading-relaxed font-montserrat">
             Not prediction. Pattern recognition.
           </p>
         </div>
 
-        {/* CTA Buttons */}
-        <div className={`flex flex-col sm:flex-row gap-4 sm:gap-6 justify-center transition-all duration-1000 delay-300 ${isLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}>
+        {/* CTA Buttons - wider spacing to show image */}
+        <div className={`flex flex-col sm:flex-row gap-6 sm:gap-16 lg:gap-24 justify-center transition-all duration-1000 delay-300 ${isLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}>
           {/* Primary Button - Modern gradient border */}
           <Link href="/booking" className="group relative px-8 sm:px-10 py-3 sm:py-4 rounded-lg font-montserrat font-medium text-sm tracking-wide overflow-hidden transition-all duration-500">
             {/* Gradient border effect */}
