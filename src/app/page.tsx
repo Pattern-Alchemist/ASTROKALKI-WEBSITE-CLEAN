@@ -2,7 +2,7 @@
 
 import { useState, useEffect, lazy, Suspense } from "react";
 import Navigation from "@/components/astrokalki/navigation";
-import Hero from "@/components/astrokalki/hero";
+import { HeroLuxury } from "@/components/hero-luxury";
 import MicroDiagnosis from "@/components/astrokalki/micro-diagnosis";
 
 // Lazy-loaded below-fold sections for performance
@@ -41,7 +41,7 @@ export default function Home() {
     <>
       <main id="main-content" className="min-h-screen flex flex-col bg-[#050505]">
         <Navigation />
-        <Hero />
+        <HeroLuxury />
         <MicroDiagnosis />
         <Suspense fallback={<SectionSkeleton />}>
           <MicroReading />

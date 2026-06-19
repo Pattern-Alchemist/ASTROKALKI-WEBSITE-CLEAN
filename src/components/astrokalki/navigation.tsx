@@ -60,7 +60,7 @@ export default function Navigation() {
             </Link>
 
             {/* Desktop nav — homepage shows section anchors, deep pages show top-level routes */}
-            <div className="hidden lg:flex items-center gap-10 xl:gap-12">
+            <div className="hidden lg:flex items-center gap-12 xl:gap-14">
               {(isHome ? navItemKeys : secondTierLinks.map((l) => ({ key: l.label, href: l.href }))).map((item) => {
                 const isAnchor = item.href.startsWith("/#");
                 const label = isHome ? t(item.key) : item.key;
@@ -77,7 +77,7 @@ export default function Navigation() {
                     <a
                       key={item.href}
                       href={item.href}
-                      className="text-[10px] tracking-[0.25em] uppercase text-[#7a7a7a] hover:text-[#f0eee9] transition-colors duration-500 font-light"
+                      className="text-[11px] sm:text-[12px] tracking-[0.2em] uppercase text-[#9a9a9a] hover:text-[#c9a96e] transition-colors duration-500 font-light whitespace-nowrap"
                     >
                       {label}
                     </a>
@@ -88,10 +88,10 @@ export default function Navigation() {
                     key={item.href}
                     href={item.href}
                     aria-current={isActive ? "page" : undefined}
-                    className={`text-[10px] tracking-[0.25em] uppercase transition-colors duration-500 font-light ${
+                    className={`text-[11px] sm:text-[12px] tracking-[0.2em] uppercase transition-colors duration-500 font-light whitespace-nowrap ${
                       isActive
-                        ? "text-[#c9a96e]"
-                        : "text-[#7a7a7a] hover:text-[#f0eee9]"
+                        ? "text-[#c9a96e] border-b border-[#c9a96e]/50 pb-1"
+                        : "text-[#9a9a9a] hover:text-[#c9a96e] hover:border-b hover:border-[#c9a96e]/30 hover:pb-1"
                     }`}
                   >
                     {label}
