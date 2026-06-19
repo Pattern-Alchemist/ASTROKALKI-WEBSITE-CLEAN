@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono, Cinzel, Inter, Playfair_Display } from "next/font/google";
+import { Geist, Geist_Mono, Cinzel, Inter, Playfair_Display, Cormorant_SC, Montserrat, Space_Grotesk } from "next/font/google";
 import { ThemeProvider } from "next-themes";
 import { I18nProvider } from "@/lib/i18n-context";
 import { PatternThemeProvider } from "@/lib/pattern-theme-context";
@@ -42,6 +42,27 @@ const playfair = Playfair_Display({
   subsets: ["latin"],
   weight: ["400", "500", "600"],
   style: ["normal", "italic"],
+  display: "swap",
+});
+
+const cormorant = Cormorant_SC({
+  variable: "--font-cormorant",
+  subsets: ["latin"],
+  weight: ["300", "400", "500", "600"],
+  display: "swap",
+});
+
+const montserrat = Montserrat({
+  variable: "--font-montserrat",
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700", "800"],
+  display: "swap",
+});
+
+const spaceGrotesk = Space_Grotesk({
+  variable: "--font-space-grotesk",
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700"],
   display: "swap",
 });
 
@@ -327,7 +348,7 @@ export default function RootLayout({
         <meta name="msapplication-TileColor" content="#0a0a0a" />
       </head>
       <body
-        className={`${geistSans.variable} ${geistMono.variable} ${cinzel.variable} ${inter.variable} ${playfair.variable} antialiased bg-background text-foreground`}
+        className={`${geistSans.variable} ${geistMono.variable} ${cinzel.variable} ${inter.variable} ${playfair.variable} ${cormorant.variable} ${montserrat.variable} ${spaceGrotesk.variable} antialiased bg-background text-foreground`}
       >
         <a
           href="#main-content"
