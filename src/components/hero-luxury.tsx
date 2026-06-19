@@ -45,35 +45,57 @@ export function HeroLuxury() {
 
           {/* CTA Buttons - vertical stack on mobile, horizontal on tablet+ */}
           <div className={`flex flex-col sm:flex-row gap-6 sm:gap-6 transition-all duration-1000 delay-300 ${isLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}>
-            {/* Primary Button */}
-            <Link href="/booking" className="group relative px-8 sm:px-10 py-3 sm:py-4 rounded-lg font-montserrat font-medium text-sm tracking-wide overflow-hidden transition-all duration-500 w-full sm:w-auto">
-              {/* Gradient border effect */}
-              <div className="absolute inset-0 bg-gradient-to-r from-[#c9a96e] to-[#a8884d] rounded-lg p-px" />
-              <div className="absolute inset-px bg-[#050505] rounded-[6px]" />
+            {/* Primary Button - Enhanced Micro-interactions */}
+            <Link href="/booking" className="group relative px-8 sm:px-10 py-3 sm:py-4 rounded-lg font-montserrat font-medium text-sm tracking-wide overflow-hidden transition-all duration-500 w-full sm:w-auto active:scale-95">
+              {/* Animated gradient border - shifts on hover */}
+              <div className="absolute inset-0 bg-gradient-to-r from-[#c9a96e] via-[#e8d5b7] to-[#a8884d] rounded-lg p-px opacity-100 group-hover:opacity-100 transition-all duration-700 group-hover:animate-pulse" />
+              <div className="absolute inset-px bg-[#050505] rounded-[6px] transition-all duration-500" />
               
-              {/* Content */}
-              <span className="relative z-10 flex items-center justify-center gap-2 text-[#c9a96e] group-hover:text-[#e8e6e1] transition-colors duration-300">
+              {/* Shimmer effect overlay */}
+              <div className="absolute inset-0 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-700">
+                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-[#e8e6e1]/20 to-transparent animate-shimmer" />
+              </div>
+              
+              {/* Content with advanced interactions */}
+              <span className="relative z-10 flex items-center justify-center gap-2 text-[#c9a96e] group-hover:text-[#e8e6e1] transition-all duration-400">
                 Begin Analysis
-                <svg className="w-4 h-4 group-hover:translate-x-1 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-4 h-4 group-hover:translate-x-2 group-hover:scale-110 transition-all duration-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                 </svg>
               </span>
 
-              {/* Glow on hover */}
-              <div className="absolute inset-0 bg-gradient-to-r from-[#c9a96e]/20 to-transparent rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-500 blur-xl" />
+              {/* Dual glow effect */}
+              <div className="absolute inset-0 bg-gradient-to-r from-[#c9a96e]/20 to-transparent rounded-lg opacity-0 group-hover:opacity-100 transition-all duration-600 blur-xl scale-75 group-hover:scale-100" />
+              <div className="absolute inset-0 rounded-lg opacity-0 group-hover:opacity-50 transition-opacity duration-700 shadow-xl shadow-[#c9a96e]/30 group-hover:shadow-2xl" />
+              
+              {/* Scale and lift on hover */}
+              <div className="absolute inset-0 rounded-lg transition-all duration-500 group-hover:shadow-2xl group-hover:shadow-[#c9a96e]/20" />
             </Link>
 
-            {/* Secondary Button */}
-            <Link href="#micro-diagnosis" className="group relative px-8 sm:px-10 py-3 sm:py-4 rounded-lg font-montserrat font-medium text-sm tracking-wide w-full sm:w-auto">
-              <div className="absolute inset-0 bg-[#c9a96e]/5 backdrop-blur-sm rounded-lg border border-[#c9a96e]/30 group-hover:border-[#c9a96e]/60 transition-all duration-500" />
-              <div className="absolute inset-0 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-500 shadow-lg shadow-[#c9a96e]/20" />
+            {/* Secondary Button - Glass morphism with advanced hover */}
+            <Link href="#micro-diagnosis" className="group relative px-8 sm:px-10 py-3 sm:py-4 rounded-lg font-montserrat font-medium text-sm tracking-wide w-full sm:w-auto overflow-hidden transition-all duration-500 active:scale-95">
+              {/* Expanding background on hover */}
+              <div className="absolute inset-0 bg-[#c9a96e]/5 backdrop-blur-sm rounded-lg border border-[#c9a96e]/30 group-hover:border-[#c9a96e]/70 group-hover:bg-[#c9a96e]/10 transition-all duration-500" />
               
-              <span className="relative z-10 flex items-center justify-center gap-2 text-[#c9a96e] group-hover:text-[#e8e6e1] transition-colors duration-300">
-                Explore Patterns
-                <svg className="w-4 h-4 group-hover:translate-x-1 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              {/* Radial glow burst effect */}
+              <div className="absolute inset-0 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-700">
+                <div className="absolute inset-0 bg-radial-gold rounded-lg" />
+              </div>
+              
+              {/* Enhanced shadow and depth */}
+              <div className="absolute inset-0 rounded-lg opacity-0 group-hover:opacity-60 transition-all duration-600 shadow-lg shadow-[#c9a96e]/30 group-hover:shadow-xl group-hover:shadow-[#c9a96e]/40" />
+              
+              {/* Content with staggered animation */}
+              <span className="relative z-10 flex items-center justify-center gap-2 text-[#c9a96e] group-hover:text-[#e8e6e1] transition-all duration-400">
+                <span className="group-hover:translate-y-[-2px] transition-all duration-300">Explore</span>
+                <span className="group-hover:translate-y-[-2px] transition-all duration-300" style={{transitionDelay: '50ms'}}>Patterns</span>
+                <svg className="w-4 h-4 group-hover:translate-x-2 group-hover:scale-110 transition-all duration-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
                 </svg>
               </span>
+              
+              {/* Lift effect */}
+              <div className="absolute inset-0 transition-all duration-500 group-hover:shadow-2xl group-hover:shadow-[#c9a96e]/15" />
             </Link>
           </div>
 

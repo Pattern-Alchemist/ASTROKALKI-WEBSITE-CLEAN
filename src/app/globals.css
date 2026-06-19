@@ -210,6 +210,25 @@ html { scroll-behavior: smooth; }
 
 .animate-hero-fadein { animation: heroFadeIn 3s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards; }
 
+/* Shimmer effect for button overlays */
+@keyframes shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+.animate-shimmer {
+  animation: shimmer 2s infinite;
+}
+
+/* Radial gradient glow effect */
+.bg-radial-gold {
+  background: radial-gradient(circle at center, rgba(201, 169, 110, 0.2) 0%, transparent 70%);
+}
+
 /* ═══════════════════════════════════════
    PREMIUM BUTTON SYSTEM
    ═══════════════════════════════════════ */
