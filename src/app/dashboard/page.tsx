@@ -75,24 +75,28 @@ export default function Dashboard() {
           </div>
 
           {/* Pattern Timeline Card */}
-          <div className="bg-white/[0.02] border border-white/[0.06] rounded-lg p-8 opacity-50">
+          <Link
+            href="/dashboard/timeline"
+            className="group bg-white/[0.02] border border-white/[0.06] hover:border-[#c9a96e]/30 rounded-lg p-8 transition-all duration-500 cursor-pointer"
+          >
             <div className="mb-6">
               <p className="text-[10px] tracking-[0.5em] uppercase text-[#c9a96e]/60 mb-3 font-light">
-                Coming Soon
+                Visualization
               </p>
-              <h2 className="text-2xl font-serif text-[#f0eee9]">
-                D3 Timeline
+              <h2 className="text-2xl font-serif text-[#f0eee9] group-hover:text-[#c9a96e] transition-colors duration-300">
+                Pattern Timeline
               </h2>
             </div>
             
             <p className="text-[#9a9a9a] text-sm leading-[1.8] mb-6 font-light">
-              An interactive D3.js visualization of your pattern timeline. Zoom, pan, and explore activation sequences over months.
+              An interactive D3.js timeline of your pattern journey. See sessions, insights, journal entries, and milestones mapped to your patterns.
             </p>
             
-            <div className="flex items-center gap-2 text-[#5a5a5a] text-xs tracking-[0.3em] uppercase font-light">
-              <span>Coming Soon</span>
+            <div className="flex items-center gap-2 text-[#c9a96e] text-xs tracking-[0.3em] uppercase font-light group-hover:gap-3 transition-all duration-300">
+              <span>View Timeline</span>
+              <span className="group-hover:translate-x-1 transition-transform">→</span>
             </div>
-          </div>
+          </Link>
 
           {/* Practitioner Dashboard Card */}
           <div className="bg-white/[0.02] border border-white/[0.06] rounded-lg p-8 opacity-50">
