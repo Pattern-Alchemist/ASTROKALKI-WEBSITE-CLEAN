@@ -2,19 +2,78 @@
 
 import Image from 'next/image';
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 
 export function HeroLuxury() {
   const [isLoaded, setIsLoaded] = useState(false);
+  const [counters, setCounters] = useState({ insights: 0, satisfaction: 0, support: 0 });
+  const statsRef = useRef<HTMLDivElement>(null);
+  const [statsInView, setStatsInView] = useState(false);
 
   useEffect(() => {
     setIsLoaded(true);
   }, []);
 
+  // Scroll-triggered counter animation
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && !statsInView) {
+          setStatsInView(true);
+        }
+      },
+      { threshold: 0.3 }
+    );
+
+    if (statsRef.current) {
+      observer.observe(statsRef.current);
+    }
+
+    return () => observer.disconnect();
+  }, [statsInView]);
+
+  useEffect(() => {
+    if (!statsInView) return;
+
+    const duration = 2000; // 2 seconds
+    const frameRate = 60;
+    const frames = (duration / 1000) * frameRate;
+    let currentFrame = 0;
+
+    const interval = setInterval(() => {
+      currentFrame++;
+      const progress = currentFrame / frames;
+
+      if (progress >= 1) {
+        setCounters({ insights: 5000, satisfaction: 98, support: 24 });
+        clearInterval(interval);
+        return;
+      }
+
+      setCounters({
+        insights: Math.floor(5000 * progress),
+        satisfaction: Math.floor(98 * progress),
+        support: Math.floor(24 * progress),
+      });
+    }, 1000 / frameRate);
+
+    return () => clearInterval(interval);
+  }, [statsInView]);
+
   return (
     <section className="relative w-full bg-[#050505] overflow-hidden">
+      {/* Animated background particles - constellation effect */}
+      <div className="absolute inset-0 z-0 opacity-40">
+        <div className="absolute top-20 left-10 w-2 h-2 bg-[#c9a96e] rounded-full animate-pulse" style={{animationDuration: '3s'}} />
+        <div className="absolute top-32 right-20 w-1.5 h-1.5 bg-[#c9a96e] rounded-full animate-pulse" style={{animationDuration: '4s', animationDelay: '1s'}} />
+        <div className="absolute top-1/4 left-1/3 w-1 h-1 bg-[#c9a96e] rounded-full animate-pulse" style={{animationDuration: '5s', animationDelay: '2s'}} />
+        <div className="absolute top-2/3 right-1/4 w-2 h-2 bg-[#c9a96e] rounded-full animate-pulse" style={{animationDuration: '3.5s', animationDelay: '0.5s'}} />
+        <div className="absolute bottom-1/3 left-1/4 w-1.5 h-1.5 bg-[#c9a96e] rounded-full animate-pulse" style={{animationDuration: '4.5s', animationDelay: '1.5s'}} />
+        <div className="absolute bottom-20 right-1/3 w-1 h-1 bg-[#c9a96e] rounded-full animate-pulse" style={{animationDuration: '3.2s', animationDelay: '0.8s'}} />
+      </div>
+
       {/* Grid layout: 2 columns on desktop, 1 on mobile */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 min-h-[100vh] gap-0">
+      <div className="grid grid-cols-1 lg:grid-cols-2 min-h-[100vh] gap-0 relative z-10">
         
         {/* LEFT COLUMN: Text Content */}
         <div className="relative z-20 flex flex-col justify-center px-6 sm:px-10 lg:px-12 py-16 sm:py-20 lg:py-24">
@@ -28,7 +87,7 @@ export function HeroLuxury() {
           {/* Main heading - positioned without overlap */}
           <h1 className={`font-cormorant text-4xl sm:text-5xl lg:text-6xl tracking-tight leading-[1.15] mb-6 sm:mb-8 transition-all duration-1000 delay-150 ${isLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}>
             <span className="block text-[#e8e6e1] font-light">Same Pattern,</span>
-            <span className="block text-[#c9a96e] font-normal">Different Face.</span>
+            <span className="block bg-gradient-to-r from-[#c9a96e] via-[#e8d5b7] to-[#c9a96e] bg-clip-text text-transparent font-normal animate-gradient-shimmer">Different Face.</span>
           </h1>
 
           {/* Luxury divider */}
@@ -99,22 +158,22 @@ export function HeroLuxury() {
             </Link>
           </div>
 
-          {/* Trust signals - moved into left column */}
-          <div className={`mt-12 sm:mt-16 pt-8 sm:pt-12 border-t border-[#c9a96e]/10 transition-all duration-1000 delay-500 ${isLoaded ? 'opacity-100' : 'opacity-0'}`}>
+          {/* Trust signals - moved into left column with floating animation */}
+          <div ref={statsRef} className={`mt-12 sm:mt-16 pt-8 sm:pt-12 border-t border-[#c9a96e]/10 transition-all duration-1000 delay-500 ${isLoaded ? 'opacity-100' : 'opacity-0'}`}>
             <p className="text-xs text-[#7a7a7a] mb-6 font-space-grotesk tracking-wide">TRUSTED BY THOUSANDS</p>
             <div className="flex gap-8 sm:gap-12">
-              <div className="text-left">
-                <p className="text-2xl sm:text-3xl font-cormorant text-[#c9a96e]">5K+</p>
+              <div className="text-left animate-float">
+                <p className="text-2xl sm:text-3xl font-cormorant text-[#c9a96e]">{counters.insights.toLocaleString()}+</p>
                 <p className="text-xs text-[#7a7a7a] mt-1 font-montserrat">Pattern Insights</p>
               </div>
               <div className="w-px h-8 bg-[#c9a96e]/20" />
-              <div className="text-left">
-                <p className="text-2xl sm:text-3xl font-cormorant text-[#c9a96e]">98%</p>
+              <div className="text-left animate-float" style={{animationDelay: '0.2s'}}>
+                <p className="text-2xl sm:text-3xl font-cormorant text-[#c9a96e]">{counters.satisfaction}%</p>
                 <p className="text-xs text-[#7a7a7a] mt-1 font-montserrat">Satisfaction Rate</p>
               </div>
               <div className="w-px h-8 bg-[#c9a96e]/20" />
-              <div className="text-left">
-                <p className="text-2xl sm:text-3xl font-cormorant text-[#c9a96e]">24/7</p>
+              <div className="text-left animate-float" style={{animationDelay: '0.4s'}}>
+                <p className="text-2xl sm:text-3xl font-cormorant text-[#c9a96e]">{counters.support}/7</p>
                 <p className="text-xs text-[#7a7a7a] mt-1 font-montserrat">Community Support</p>
               </div>
             </div>

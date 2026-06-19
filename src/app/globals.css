@@ -229,7 +229,22 @@ html { scroll-behavior: smooth; }
   background: radial-gradient(circle at center, rgba(201, 169, 110, 0.2) 0%, transparent 70%);
 }
 
-/* ═══════════════════════════════════════
+/* Gradient shimmer animation for text */
+@keyframes gradientShimmer {
+  0%, 100% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+}
+
+.animate-gradient-shimmer {
+  background-size: 200% 100%;
+  animation: gradientShimmer 3s ease-in-out infinite;
+}
+
+/* ════════════════════════════════════��══
    PREMIUM BUTTON SYSTEM
    ═══════════════════════════════════════ */
 
@@ -546,6 +561,10 @@ html { scroll-behavior: smooth; }
 
 /* Floating elements */
 .float-element {
+  animation: float 6s ease-in-out infinite;
+}
+
+.animate-float {
   animation: float 6s ease-in-out infinite;
 }
 
