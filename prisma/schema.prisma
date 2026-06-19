@@ -257,6 +257,18 @@ model VerificationToken {
   @@unique([identifier, token])
 }
 
+// ─── Google Calendar integration (Enhancement #62) ───
+model GoogleCalendarCredentials {
+  id              String    @id @default(cuid())
+  email           String    @unique // user's email for bookings
+  accessToken     String    // OAuth2 access token (encrypted in production)
+  refreshToken    String?   // OAuth2 refresh token for token refresh
+  expiryDate      DateTime? // When access token expires
+  enabledAt       DateTime  @default(now())
+  lastUsedAt      DateTime?
+  updatedAt       DateTime  @updatedAt
+}
+
 model SiteConfig {
   id        String   @id @default(cuid())
   key       String   @unique
