@@ -19,46 +19,51 @@ export function HeroLuxury() {
           src="/hero-luxury-chair.jpg"
           alt="Luxury introspection - Your seat of consciousness"
           fill
-          className="object-cover opacity-40"
+          className="object-cover opacity-70"
           priority
-          quality={90}
+          quality={95}
         />
-        {/* Gradient overlay */}
-        <div className="absolute inset-0 bg-gradient-to-b from-[#050505] via-transparent to-[#050505] opacity-70" />
+        {/* Gradient overlay - strategic to frame content while showing image */}
+        <div className="absolute inset-0 bg-gradient-to-b from-[#050505]/90 via-[#050505]/30 to-[#050505]/90" />
         {/* Neon glow accent */}
         <div className="absolute top-1/3 right-0 w-96 h-96 bg-[#c9a96e] rounded-full blur-3xl opacity-5 animate-pulse" />
       </div>
 
-      {/* Content */}
-      <div className="relative z-10 max-w-5xl mx-auto px-6 sm:px-10 text-center flex flex-col items-center">
-        {/* Luxury header text */}
-        <div className={`transition-all duration-1000 mb-8 ${isLoaded ? 'opacity-100' : 'opacity-0'}`}>
+      {/* Content - restructured for image prominence */}
+      <div className="relative z-10 w-full px-6 sm:px-10 flex flex-col items-center">
+        {/* Top section: Navigation text only */}
+        <div className={`transition-all duration-1000 mb-24 sm:mb-32 lg:mb-40 ${isLoaded ? 'opacity-100' : 'opacity-0'}`}>
           {/* Premium overline */}
-          <p className="text-xs sm:text-sm tracking-[0.4em] uppercase font-space-grotesk text-[#c9a96e]/70 mb-6 sm:mb-8">
+          <p className="text-xs sm:text-sm tracking-[0.4em] uppercase font-space-grotesk text-[#c9a96e]/70">
             Pattern Recognition Through Vedic Astrology
           </p>
+        </div>
 
+        {/* Middle section: Large gap for image visibility */}
+        <div className="h-32 sm:h-48 lg:h-64 w-full" />
+
+        {/* Bottom section: Heading and buttons */}
+        <div className="flex flex-col items-center">
           {/* Main heading - simplified, impactful */}
-          <h1 className="font-cormorant text-5xl sm:text-6xl lg:text-7xl tracking-tight leading-[1.15] mb-3 sm:mb-4">
+          <h1 className={`font-cormorant text-5xl sm:text-6xl lg:text-7xl tracking-tight leading-[1.15] mb-4 sm:mb-6 text-center max-w-4xl transition-all duration-1000 delay-150 ${isLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}>
             <span className="block text-[#e8e6e1] font-light">Same Pattern,</span>
             <span className="block text-[#c9a96e] font-normal">Different Face.</span>
           </h1>
 
           {/* Luxury divider */}
-          <div className="flex items-center justify-center gap-4 my-5 sm:my-6">
+          <div className={`flex items-center justify-center gap-4 my-5 sm:my-6 transition-all duration-1000 delay-200 ${isLoaded ? 'opacity-100' : 'opacity-0'}`}>
             <div className="w-8 sm:w-12 h-px bg-gradient-to-r from-transparent to-[#c9a96e]/40" />
             <div className="w-2 h-2 bg-[#c9a96e] rounded-full" />
             <div className="w-8 sm:w-12 h-px bg-gradient-to-l from-transparent to-[#c9a96e]/40" />
           </div>
 
-          {/* Elegant subheading - concise, positioned higher */}
-          <p className="text-sm sm:text-base text-[#b0aca5] max-w-xl mx-auto font-light leading-relaxed font-montserrat">
+          {/* Elegant subheading - positioned above buttons */}
+          <p className={`text-sm sm:text-base text-[#b0aca5] max-w-xl mx-auto font-light leading-relaxed font-montserrat mb-10 sm:mb-12 transition-all duration-1000 delay-250 ${isLoaded ? 'opacity-100' : 'opacity-0'}`}>
             Not prediction. Pattern recognition.
           </p>
-        </div>
 
-        {/* CTA Buttons - wider spacing to show image */}
-        <div className={`flex flex-col sm:flex-row gap-6 sm:gap-16 lg:gap-24 justify-center transition-all duration-1000 delay-300 ${isLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}>
+          {/* CTA Buttons - maximum gap to frame image */}
+          <div className={`flex flex-col sm:flex-row gap-8 sm:gap-32 lg:gap-48 justify-center transition-all duration-1000 delay-300 ${isLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}>
           {/* Primary Button - Modern gradient border */}
           <Link href="/booking" className="group relative px-8 sm:px-10 py-3 sm:py-4 rounded-lg font-montserrat font-medium text-sm tracking-wide overflow-hidden transition-all duration-500">
             {/* Gradient border effect */}
@@ -91,9 +96,9 @@ export function HeroLuxury() {
           </Link>
         </div>
 
-        {/* Trust signals */}
-        <div className={`mt-12 sm:mt-16 pt-8 sm:pt-12 border-t border-[#c9a96e]/10 transition-all duration-1000 delay-500 ${isLoaded ? 'opacity-100' : 'opacity-0'}`}>
-          <p className="text-xs text-[#7a7a7a] mb-6 font-space-grotesk tracking-wide">TRUSTED BY THOUSANDS</p>
+        {/* Trust signals - positioned lower */}
+        <div className={`mt-16 sm:mt-20 lg:mt-24 pt-8 sm:pt-12 border-t border-[#c9a96e]/10 w-full max-w-5xl transition-all duration-1000 delay-500 ${isLoaded ? 'opacity-100' : 'opacity-0'}`}>
+          <p className="text-xs text-[#7a7a7a] mb-6 font-space-grotesk tracking-wide text-center">TRUSTED BY THOUSANDS</p>
           <div className="flex flex-wrap justify-center gap-8 sm:gap-12 items-center">
             <div className="text-center">
               <p className="text-2xl sm:text-3xl font-cormorant text-[#c9a96e]">5K+</p>
@@ -110,6 +115,7 @@ export function HeroLuxury() {
               <p className="text-xs text-[#7a7a7a] mt-1 font-montserrat">Community Support</p>
             </div>
           </div>
+        </div>
         </div>
       </div>
 
