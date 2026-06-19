@@ -57,33 +57,62 @@ export default function MicroDiagnosis() {
           </h2>
         </div>
 
-        {/* Pattern options — pure typographic list, no boxes */}
-        <div className="border-t border-white/[0.06]">
-          {patternIds.map((pattern, i) => (
-            <button
-              key={pattern.id}
-              onClick={() => togglePattern(pattern.id)}
-              className={`w-full text-left border-b border-white/[0.06] py-6 sm:py-8 grid grid-cols-12 gap-6 items-baseline transition-colors duration-500 ${
-                selected.includes(pattern.id) ? "bg-white/[0.02]" : "hover:bg-white/[0.015]"
-              }`}
-            >
-              <span className="col-span-2 sm:col-span-1 text-[11px] tracking-[0.3em] text-[#c9a96e]/40 font-mono pt-1">
-                {String(i + 1).padStart(2, "0")}
-              </span>
-              <div className="col-span-10 sm:col-span-11">
-                <p className={`text-lg sm:text-xl md:text-2xl font-serif font-light leading-tight transition-colors duration-500 ${
-                  selected.includes(pattern.id) ? "text-[#c9a96e]" : "text-[#9a9a9a] hover:text-[#f0eee9]"
-                }`}>
-                  {t(pattern.labelKey)}
-                </p>
-                {selected.includes(pattern.id) && (
-                  <p className="text-[#c9a96e]/70 text-[13px] italic mt-3 font-light leading-relaxed">
-                    {t(pattern.insightKey)}
-                  </p>
+        {/* Pattern options — glass cards with glow */}
+        <div className="space-y-4 sm:space-y-6">
+          {patternIds.map((pattern, i) => {
+            const isSelected = selected.includes(pattern.id);
+            return (
+              <button
+                key={pattern.id}
+                onClick={() => togglePattern(pattern.id)}
+                className={`relative w-full text-left rounded-xl px-6 sm:px-8 py-5 sm:py-7 transition-all duration-500 group ${
+                  isSelected
+                    ? "bg-[#c9a96e]/8 border border-[#c9a96e]/50 shadow-lg shadow-[#c9a96e]/15"
+                    : "bg-white/[0.02] border border-white/[0.08] hover:bg-white/[0.04] hover:border-[#c9a96e]/30"
+                }`}
+              >
+                {/* Glow background on select */}
+                {isSelected && (
+                  <div className="absolute inset-0 rounded-xl bg-gradient-to-r from-[#c9a96e]/10 to-transparent opacity-50 blur-xl -z-10" />
                 )}
-              </div>
-            </button>
-          ))}
+
+                <div className="flex items-baseline gap-6">
+                  {/* Number badge */}
+                  <span className={`text-xs sm:text-sm tracking-[0.3em] font-mono font-bold pt-1 transition-colors duration-500 ${
+                    isSelected ? "text-[#c9a96e]" : "text-[#c9a96e]/50"
+                  }`}>
+                    {String(i + 1).padStart(2, "0")}
+                  </span>
+
+                  {/* Pattern content */}
+                  <div className="flex-1 min-w-0">
+                    <p className={`text-base sm:text-lg md:text-xl font-montserrat font-semibold leading-tight transition-colors duration-500 ${
+                      isSelected
+                        ? "text-[#e8e6e1]"
+                        : "text-[#b0aca5] group-hover:text-[#e8e6e1]"
+                    }`}>
+                      {t(pattern.labelKey)}
+                    </p>
+                    
+                    {isSelected && (
+                      <p className="text-[#c9a96e]/80 text-xs sm:text-sm mt-3 font-montserrat font-light leading-relaxed">
+                        {t(pattern.insightKey)}
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Check icon */}
+                  {isSelected && (
+                    <div className="flex-shrink-0">
+                      <svg className="w-5 h-5 sm:w-6 sm:h-6 text-[#c9a96e] animate-pulse" fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" />
+                      </svg>
+                    </div>
+                  )}
+                </div>
+              </button>
+            );
+          })}
         </div>
 
         {/* Continue CTA */}
@@ -96,7 +125,7 @@ export default function MicroDiagnosis() {
               transition={{ duration: 0.4 }}
               className="mt-16 sm:mt-20"
             >
-              <p className="text-[#9a9a9a] text-sm leading-relaxed mb-8 max-w-md font-light">
+              <p className="text-[#b0aca5] text-sm leading-relaxed mb-10 max-w-md font-montserrat font-light">
                 {selected.length === 1
                   ? t("microDiagnosis.onePattern")
                   : `${selected.length} ${t("microDiagnosis.multiplePatterns")}`}
@@ -104,10 +133,20 @@ export default function MicroDiagnosis() {
               </p>
               <button
                 onClick={handleContinue}
-                className="inline-flex items-center gap-4 text-[11px] tracking-[0.3em] uppercase text-[#f0eee9] border-b border-[#c9a96e]/50 pb-3 hover:border-[#c9a96e] transition-colors duration-500 cursor-pointer"
+                className="group relative inline-flex items-center gap-3 px-8 py-3 rounded-lg font-montserrat font-semibold text-sm tracking-wide overflow-hidden transition-all duration-500"
               >
-                {t("microDiagnosis.continue")}
-                <span className="text-[#c9a96e]">→</span>
+                {/* Gradient border background */}
+                <div className="absolute inset-0 bg-gradient-to-r from-[#c9a96e] to-[#a8884d] rounded-lg p-px" />
+                <div className="absolute inset-px bg-[#050505] rounded-[6px]" />
+                
+                {/* Content */}
+                <span className="relative z-10 flex items-center gap-3 text-[#c9a96e] group-hover:text-[#e8e6e1] transition-colors duration-300">
+                  {t("microDiagnosis.continue")}
+                  <span className="group-hover:translate-x-1 transition-transform duration-300">→</span>
+                </span>
+
+                {/* Glow on hover */}
+                <div className="absolute inset-0 bg-gradient-to-r from-[#c9a96e]/20 to-transparent rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-500 blur-xl" />
               </button>
             </motion.div>
           )}

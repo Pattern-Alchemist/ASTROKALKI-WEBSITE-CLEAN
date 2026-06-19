@@ -564,6 +564,65 @@ html { scroll-behavior: smooth; }
 }
 
 /* Responsive adjustments */
+/* Modern gradient border button */
+.btn-gradient-border {
+  position: relative;
+  overflow: hidden;
+  transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.btn-gradient-border::before {
+  content: '';
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background: conic-gradient(
+    from 0deg,
+    #c9a96e,
+    #e8e6e1,
+    #c9a96e,
+    #c9a96e
+  );
+  animation: rotate 4s linear infinite;
+  z-index: -1;
+  opacity: 0;
+  transition: opacity 0.5s;
+}
+
+.btn-gradient-border:hover::before {
+  opacity: 0.3;
+}
+
+@keyframes rotate {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* Premium link button */
+.btn-link-premium {
+  position: relative;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.btn-link-premium::after {
+  content: '';
+  position: absolute;
+  bottom: -2px;
+  left: 0;
+  width: 0;
+  height: 2px;
+  background: linear-gradient(90deg, #c9a96e, transparent);
+  transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.btn-link-premium:hover::after {
+  width: 100%;
+}
+
 @media (max-width: 768px) {
   .glass-card {
     background: rgba(10, 10, 10, 0.5);

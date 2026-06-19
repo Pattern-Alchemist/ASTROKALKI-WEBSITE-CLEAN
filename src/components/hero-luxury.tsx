@@ -38,44 +38,53 @@ export function HeroLuxury() {
             Pattern Recognition Through Vedic Astrology
           </p>
 
-          {/* Main heading - modern script luxury */}
-          <h1 className="font-cormorant text-5xl sm:text-6xl lg:text-7xl tracking-tight leading-[1.1] mb-6 sm:mb-8">
-            <span className="block text-[#e8e6e1] font-light">The Same Pain.</span>
+          {/* Main heading - simplified, impactful */}
+          <h1 className="font-cormorant text-5xl sm:text-6xl lg:text-7xl tracking-tight leading-[1.15] mb-4 sm:mb-6">
+            <span className="block text-[#e8e6e1] font-light">Same Pattern,</span>
             <span className="block text-[#c9a96e] font-normal">Different Face.</span>
-            <span className="block text-[#e8e6e1] font-light">Same Pattern.</span>
           </h1>
 
           {/* Luxury divider */}
-          <div className="flex items-center justify-center gap-4 my-8 sm:my-10">
-            <div className="w-8 sm:w-12 h-px bg-gradient-to-r from-transparent to-[#c9a96e]/50" />
+          <div className="flex items-center justify-center gap-4 my-6 sm:my-8">
+            <div className="w-8 sm:w-12 h-px bg-gradient-to-r from-transparent to-[#c9a96e]/40" />
             <div className="w-2 h-2 bg-[#c9a96e] rounded-full" />
-            <div className="w-8 sm:w-12 h-px bg-gradient-to-l from-transparent to-[#c9a96e]/50" />
+            <div className="w-8 sm:w-12 h-px bg-gradient-to-l from-transparent to-[#c9a96e]/40" />
           </div>
 
-          {/* Subheading */}
-          <p className="text-base sm:text-lg text-[#9a9a9a] max-w-2xl mx-auto font-light leading-relaxed mb-8 sm:mb-12 font-montserrat">
-            Relationships. Self-sabotage. Emotional confusion. Sometimes the problem isn&apos;t your choices — it&apos;s the pattern beneath them. 
-            <span className="block text-[#c9a96e] font-medium mt-3">Not prediction. Pattern recognition.</span>
+          {/* Elegant subheading - concise */}
+          <p className="text-sm sm:text-base text-[#b0aca5] max-w-xl mx-auto font-light leading-relaxed mb-10 sm:mb-12 font-montserrat">
+            Not prediction. Pattern recognition.
           </p>
         </div>
 
         {/* CTA Buttons */}
         <div className={`flex flex-col sm:flex-row gap-4 sm:gap-6 justify-center transition-all duration-1000 delay-300 ${isLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}>
-          {/* Primary Button */}
-          <Link href="/booking" className="glass-button group relative">
-            <span className="relative z-10 flex items-center justify-center gap-2 font-montserrat font-semibold">
-              Begin Your Pattern Analysis
-              <svg className="w-4 h-4 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          {/* Primary Button - Modern gradient border */}
+          <Link href="/booking" className="group relative px-8 sm:px-10 py-3 sm:py-4 rounded-lg font-montserrat font-medium text-sm tracking-wide overflow-hidden transition-all duration-500">
+            {/* Gradient border effect */}
+            <div className="absolute inset-0 bg-gradient-to-r from-[#c9a96e] to-[#a8884d] rounded-lg p-px" />
+            <div className="absolute inset-px bg-[#050505] rounded-[6px]" />
+            
+            {/* Content */}
+            <span className="relative z-10 flex items-center justify-center gap-2 text-[#c9a96e] group-hover:text-[#e8e6e1] transition-colors duration-300">
+              Begin Analysis
+              <svg className="w-4 h-4 group-hover:translate-x-1 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
               </svg>
             </span>
+
+            {/* Glow on hover */}
+            <div className="absolute inset-0 bg-gradient-to-r from-[#c9a96e]/20 to-transparent rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-500 blur-xl" />
           </Link>
 
-          {/* Secondary Button */}
-          <Link href="#explore" className="group border border-[#c9a96e]/30 hover:border-[#c9a96e]/60 rounded-lg px-8 py-3 sm:py-4 text-[#c9a96e] font-montserrat font-semibold text-sm tracking-wide transition-all duration-500 backdrop-blur-sm hover:bg-[#c9a96e]/5">
-            <span className="flex items-center justify-center gap-2">
+          {/* Secondary Button - Glass style with border glow */}
+          <Link href="#explore" className="group relative px-8 sm:px-10 py-3 sm:py-4 rounded-lg font-montserrat font-medium text-sm tracking-wide">
+            <div className="absolute inset-0 bg-[#c9a96e]/5 backdrop-blur-sm rounded-lg border border-[#c9a96e]/30 group-hover:border-[#c9a96e]/60 transition-all duration-500" />
+            <div className="absolute inset-0 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-500 shadow-lg shadow-[#c9a96e]/20" />
+            
+            <span className="relative z-10 flex items-center justify-center gap-2 text-[#c9a96e] group-hover:text-[#e8e6e1] transition-colors duration-300">
               Explore Patterns
-              <svg className="w-4 h-4 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-4 h-4 group-hover:translate-x-1 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
               </svg>
             </span>
