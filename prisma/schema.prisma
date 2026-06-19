@@ -319,6 +319,49 @@ model CircleReply {
   post            CirclePost @relation(fields: [postId], references: [id], onDelete: Cascade)
 }
 
+// ─── Moderated Q&A Forum (Enhancement #75) ───
+model ForumCategory {
+  id              String    @id @default(cuid())
+  name            String    // e.g., "Pattern Recognition"
+  slug            String    @unique
+  description     String?
+  color           String    @default("#c9a96e")
+  questionCount   Int       @default(0)
+  createdAt       DateTime  @default(now())
+  questions       ForumQuestion[]
+}
+
+model ForumQuestion {
+  id              String    @id @default(cuid())
+  categoryId      String
+  authorEmail     String
+  title           String
+  content         String
+  tags            String    @default("") // comma-separated tags
+  isFeatured      Boolean   @default(false)
+  isModerated     Boolean   @default(true)
+  isAnswered      Boolean   @default(false)
+  views           Int       @default(0)
+  upvotes         Int       @default(0)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  category        ForumCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  answers         ForumAnswer[]
+}
+
+model ForumAnswer {
+  id              String    @id @default(cuid())
+  questionId      String
+  authorEmail     String
+  content         String
+  isModerated     Boolean   @default(true)
+  isMarkedSolution Boolean @default(false)
+  upvotes         Int       @default(0)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  question        ForumQuestion @relation(fields: [questionId], references: [id], onDelete: Cascade)
+}
+
 model SiteConfig {
   id        String   @id @default(cuid())
   key       String   @unique
