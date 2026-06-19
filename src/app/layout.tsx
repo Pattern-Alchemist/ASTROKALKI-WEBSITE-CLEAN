@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono, Cinzel, Inter, Playfair_Display } from "next/font/google";
 import { ThemeProvider } from "next-themes";
 import { I18nProvider } from "@/lib/i18n-context";
+import { PatternThemeProvider } from "@/lib/pattern-theme-context";
 import { GA4Tracker } from "@/components/analytics/ga4-tracker";
 import "./globals.css";
 import { Toaster } from "@/components/ui/toaster";
@@ -342,8 +343,10 @@ export default function RootLayout({
             enableSystem={false}
             disableTransitionOnChange
           >
-            {children}
-            <Toaster />
+            <PatternThemeProvider>
+              {children}
+              <Toaster />
+            </PatternThemeProvider>
           </ThemeProvider>
         </I18nProvider>
       </body>

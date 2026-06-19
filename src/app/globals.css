@@ -88,6 +88,10 @@
   --sidebar-accent-foreground: #e8e6e1;
   --sidebar-border: rgba(255,255,255,0.05);
   --sidebar-ring: #c9a96e;
+
+  /* Pattern-themed accent — defaults to gold, updated by PatternThemeProvider */
+  --pattern-accent: #c9a96e;
+  --pattern-accent-rgb: 201, 169, 110;
 }
 
 /* Celestial Light Mode — warm cream + gold */
