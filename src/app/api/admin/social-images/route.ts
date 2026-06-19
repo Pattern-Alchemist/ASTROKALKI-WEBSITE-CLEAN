@@ -73,9 +73,9 @@ export async function GET(_request: NextRequest) {
         cluster: a.cluster,
         category: a.cluster,
         status: 'generated',
-        imageUrl: row.imageUrl,
-        prompt: row.prompt,
-        createdAt: row.createdAt.toISOString(),
+        imageUrl: (row as any)?.imageUrl,
+        prompt: (row as any)?.prompt,
+        createdAt: (row as any)?.createdAt?.toISOString(),
       });
     } else {
       items.push({
@@ -101,9 +101,9 @@ export async function GET(_request: NextRequest) {
         kind: 'atlas',
         category: 'atlas',
         status: 'generated',
-        imageUrl: row.imageUrl,
-        prompt: row.prompt,
-        createdAt: row.createdAt.toISOString(),
+        imageUrl: (row as any)?.imageUrl,
+        prompt: (row as any)?.prompt,
+        createdAt: (row as any)?.createdAt?.toISOString(),
       });
     } else {
       items.push({
@@ -128,9 +128,9 @@ export async function GET(_request: NextRequest) {
         kind: 'guide',
         category: 'guide',
         status: 'generated',
-        imageUrl: row.imageUrl,
-        prompt: row.prompt,
-        createdAt: row.createdAt.toISOString(),
+        imageUrl: (row as any)?.imageUrl,
+        prompt: (row as any)?.prompt,
+        createdAt: (row as any)?.createdAt?.toISOString(),
       });
     } else {
       items.push({

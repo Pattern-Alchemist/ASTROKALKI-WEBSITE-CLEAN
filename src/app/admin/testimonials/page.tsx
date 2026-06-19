@@ -140,8 +140,8 @@ export default async function AdminTestimonialsPage({
       return {
         ...(t as TestimonialRow),
         verified: Boolean(v),
-        verifiedBookingId: v?.bookingId ?? null,
-        verifiedAt: v?.verifiedAt ?? null,
+        verifiedBookingId: v ? (v as any)?.bookingId ?? null : null,
+        verifiedAt: v ? (v as any)?.verifiedAt ?? null : null,
       };
     });
     counts = {
