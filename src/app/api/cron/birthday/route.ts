@@ -70,13 +70,13 @@ export async function GET(request: NextRequest) {
     );
 
     for (const reading of uniqueReadingEmails) {
-      if (newsletterEmails.has(reading.email.toLowerCase())) {
+      if (newsletterEmails.has((reading as any)?.email?.toLowerCase())) {
         stats.skipped++;
         continue;
       }
 
       let record = await db.newsletter.findUnique({
-        where: { email: reading.email },
+        where: { email: (reading as any)?.email },
       });
 
       if (record?.optedOut) {
