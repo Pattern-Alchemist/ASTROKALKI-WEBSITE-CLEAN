@@ -33,7 +33,7 @@ import { NextResponse } from 'next/server';
  * - font-src 'self' data:              — system fonts + occasional data URIs
  * - frame-src youtube-nocookie.com     — YouTube embeds only
  * - connect-src 'self'                 — no external browser-side API calls
- * - frame-ancestors 'none'             — clickjacking protection
+ * - frame-ancestors allows preview + production domains
  * - base-uri 'self'                    — prevent base-hijack
  * - form-action 'self'                 — prevent form POST exfiltration
  */
@@ -46,7 +46,7 @@ export const CSP_HEADER =
     "font-src 'self' data:",
     "frame-src https://www.youtube-nocookie.com https://youtube-nocookie.com",
     "connect-src 'self'",
-    "frame-ancestors 'none'",
+    "frame-ancestors 'self' https://preview-0e79c0ab.space-z.ai https://v0.app https://*.vercel.app",
     "base-uri 'self'",
     "form-action 'self'",
     "object-src 'none'",
@@ -55,7 +55,7 @@ export const CSP_HEADER =
 
 export const SECURITY_HEADERS: Record<string, string> = {
   'Content-Security-Policy': CSP_HEADER,
-  'X-Frame-Options': 'DENY',                    // legacy clickjacking defense; CSP frame-ancestors is the modern one
+  'X-Frame-Options': 'SAMEORIGIN',              // allow framing on same-origin and dev preview
   'X-Content-Type-Options': 'nosniff',          // MIME sniffing off
   'Referrer-Policy': 'strict-origin-when-cross-origin',
   'Permissions-Policy': [
