@@ -126,10 +126,10 @@ export function AdaptiveDashboardGrid() {
           <Link
             key={card.id}
             href={card.href || '#'}
-            className={`group bg-white/[0.02] border rounded-lg p-8 transition-all duration-500 cursor-pointer ${
+            className={`group glass-card ${
               isHighlyEngaged
-                ? 'border-[#c9a96e]/50 hover:border-[#c9a96e] shadow-lg shadow-[#c9a96e]/5'
-                : 'border-white/[0.06] hover:border-[#c9a96e]/30'
+                ? 'border-[#c9a96e]/30 hover:border-[#c9a96e]/50 hover:shadow-lg hover:shadow-[#c9a96e]/10'
+                : 'hover:border-[#c9a96e]/25'
             }`}
           >
             <div className="mb-6">
@@ -164,7 +164,7 @@ export function AdaptiveDashboardGrid() {
       {comingSoon.map((card) => (
         <div
           key={card.id}
-          className="bg-white/[0.02] border border-white/[0.06] rounded-lg p-8 opacity-50"
+          className="glass-card opacity-40"
         >
           <div className="mb-6">
             <p className="text-[10px] tracking-[0.5em] uppercase text-[#c9a96e]/60 mb-3 font-light">
@@ -191,7 +191,7 @@ function DefaultDashboardGrid() {
     <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-20">
       <Link
         href="/dashboard/mood-trends"
-        className="group bg-white/[0.02] border border-white/[0.06] hover:border-[#c9a96e]/30 rounded-lg p-8 transition-all duration-500 cursor-pointer"
+        className="group glass-card"
       >
         <div className="mb-6">
           <p className="text-[10px] tracking-[0.5em] uppercase text-[#c9a96e]/60 mb-3 font-light">
@@ -213,7 +213,7 @@ function DefaultDashboardGrid() {
         </div>
       </Link>
 
-      <div className="bg-white/[0.02] border border-white/[0.06] rounded-lg p-8 opacity-50">
+      <div className="glass-card opacity-40">
         <div className="mb-6">
           <p className="text-[10px] tracking-[0.5em] uppercase text-[#c9a96e]/60 mb-3 font-light">
             Coming Soon
@@ -233,7 +233,7 @@ function DefaultDashboardGrid() {
 
       <Link
         href="/dashboard/timeline"
-        className="group bg-white/[0.02] border border-white/[0.06] hover:border-[#c9a96e]/30 rounded-lg p-8 transition-all duration-500 cursor-pointer"
+        className="group glass-card"
       >
         <div className="mb-6">
           <p className="text-[10px] tracking-[0.5em] uppercase text-[#c9a96e]/60 mb-3 font-light">
