@@ -101,7 +101,7 @@ export async function GET(request: NextRequest) {
       const recapByBooking = new Map(recaps.map((r) => [r.bookingId, r]));
 
       for (const booking of candidates) {
-        const recap = recapByBooking.get(booking.id);
+        const recap = recapByBooking.get(booking.id) as any;
         if (recap?.prepSentAt) {
           // Already sent — skip.
           stats.skipped++;

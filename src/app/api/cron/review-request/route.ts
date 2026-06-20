@@ -140,7 +140,7 @@ export async function GET(request: NextRequest) {
 
     // ─── Dispatch review-request emails ───────────────────────────
     for (const recap of recaps) {
-      const booking = bookingById.get(recap.bookingId);
+      const booking = bookingById.get(recap.bookingId) as any;
       if (!booking) {
         // SessionRecap without a Booking — orphan row, skip.
         stats.errors++;
@@ -149,7 +149,7 @@ export async function GET(request: NextRequest) {
 
       // Booking must still be 'completed' (might have been retroactively
       // cancelled/refunded).
-      if (booking.status !== "completed") {
+      if (booking?.status !== "completed") {
         stats.skippedBookingNotCompleted++;
         continue;
       }

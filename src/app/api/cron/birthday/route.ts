@@ -98,22 +98,23 @@ export async function GET(request: NextRequest) {
         continue;
       }
 
+      const readingData = reading as any;
       try {
-        await sendBirthdayEmail(reading.email, reading.birthMonth);
+        await sendBirthdayEmail(readingData.email, readingData.birthMonth);
         if (record) {
           await db.newsletter.update({
             where: { id: record.id },
             data: {
-              birthMonth: reading.birthMonth,
+              birthMonth: readingData.birthMonth,
               lastBirthdayYear: currentYear,
             },
           });
         } else {
           await db.newsletter.create({
             data: {
-              email: reading.email,
+              email: readingData.email,
               source: "micro-reading-birthday",
-              birthMonth: reading.birthMonth,
+              birthMonth: readingData.birthMonth,
               lastBirthdayYear: currentYear,
               dripStage: 99,
             },
@@ -122,7 +123,7 @@ export async function GET(request: NextRequest) {
         stats.sent++;
       } catch (err) {
         console.error(
-          `[cron/birthday] Reading-recipient send failed for ${reading.email}:`,
+          `[cron/birthday] Reading-recipient send failed for ${readingData.email}:`,
           err
         );
         stats.errors++;
