@@ -100,19 +100,26 @@ function interpretTopFrustration(topFrustration: string | null): string {
 
 export default async function ResearchPage() {
   // Aggregate data in parallel
-  const [microReadings, bookings] = await Promise.all([
-    db.microReading.findMany({
-      select: {
-        emotionalPattern: true,
-        relationshipFrustration: true,
-        birthMonth: true,
-        createdAt: true,
-      },
-    }),
-    db.booking.findMany({
-      select: { contexts: true, duration: true, price: true, status: true, createdAt: true },
-    }),
-  ]);
+  let microReadings: any[] = [];
+  let bookings: any[] = [];
+  
+  try {
+    [microReadings, bookings] = await Promise.all([
+      db.microReading.findMany({
+        select: {
+          emotionalPattern: true,
+          relationshipFrustration: true,
+          birthMonth: true,
+          createdAt: true,
+        },
+      }),
+      db.booking.findMany({
+        select: { contexts: true, duration: true, price: true, status: true, createdAt: true },
+      }),
+    ]);
+  } catch {
+    // Database unavailable during build — use empty arrays
+  }
 
   // Aggregate by emotional pattern
   const patternCounts: Record<string, number> = {};

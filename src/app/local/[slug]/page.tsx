@@ -36,10 +36,15 @@ export const dynamic = "force-static";
 export const revalidate = 3600;
 
 export async function generateStaticParams() {
-  const pages = await db.programmaticPage.findMany({
-    select: { slug: true },
-  });
-  return pages.map((p) => ({ slug: p.slug }));
+  try {
+    const pages = await db.programmaticPage.findMany({
+      select: { slug: true },
+    });
+    return pages.map((p) => ({ slug: p.slug }));
+  } catch {
+    // Return empty array if database is not available during build
+    return [];
+  }
 }
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
