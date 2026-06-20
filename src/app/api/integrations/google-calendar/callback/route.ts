@@ -33,8 +33,9 @@ export async function GET(request: NextRequest) {
     const tokenResult = await exchangeCodeForTokens(code, redirectUri);
 
     if (!tokenResult.success) {
+      const errorMsg = (tokenResult as any)?.error || 'Unknown error';
       return NextResponse.redirect(
-        new URL(`/dashboard?calendar-error=${encodeURIComponent(tokenResult.error)}`, request.url)
+        new URL(`/dashboard?calendar-error=${encodeURIComponent(errorMsg)}`, request.url)
       );
     }
 
