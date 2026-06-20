@@ -7,16 +7,17 @@ import { db } from '@/lib/db';
  */
 export async function GET(
   request: NextRequest,
-  { params }: { params: { circleId: string } }
+  { params }: { params: Promise<{ circleId: string }> }
 ) {
   try {
+    const resolvedParams = await params;
     const { searchParams } = new URL(request.url);
     const page = parseInt(searchParams.get('page') || '1');
     const limit = parseInt(searchParams.get('limit') || '20');
     const skip = (page - 1) * limit;
 
     const posts = await db.circlePost.findMany({
-      where: { circleId: params.circleId },
+      where: { circleId: resolvedParams.circleId },
       include: {
         replies: {
           orderBy: { createdAt: 'desc' },
@@ -29,7 +30,7 @@ export async function GET(
     });
 
     const total = await db.circlePost.count({
-      where: { circleId: params.circleId },
+      where: { circleId: resolvedParams.circleId },
     });
 
     return NextResponse.json({
@@ -56,9 +57,10 @@ export async function GET(
  */
 export async function POST(
   request: NextRequest,
-  { params }: { params: { circleId: string } }
+  { params }: { params: Promise<{ circleId: string }> }
 ) {
   try {
+    const resolvedParams = await params;
     const body = await request.json();
     const { authorEmail, title, content } = body;
 
@@ -73,7 +75,7 @@ export async function POST(
     const member = await db.circleMember.findUnique({
       where: {
         circleId_email: {
-          circleId: params.circleId,
+          circleId: resolvedParams.circleId,
           email: authorEmail,
         },
       },
@@ -88,7 +90,7 @@ export async function POST(
 
     const post = await db.circlePost.create({
       data: {
-        circleId: params.circleId,
+        circleId: resolvedParams.circleId,
         authorEmail,
         title,
         content,

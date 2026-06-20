@@ -81,12 +81,12 @@ export async function GET() {
     );
 
     const withVerified = testimonials.map((t) => {
-      const v = verifiedByTestimonial.get(t.id);
+      const v = verifiedByTestimonial.get(t.id) as any;
       return {
         ...t,
         verified: Boolean(v),
-        verifiedBookingId: v?.bookingId ?? null,
-        verifiedAt: v?.verifiedAt ?? null,
+        verifiedBookingId: v ? (v?.bookingId ?? null) : null,
+        verifiedAt: v ? (v?.verifiedAt ?? null) : null,
       };
     });
 

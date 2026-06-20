@@ -7,12 +7,13 @@ import { db } from '@/lib/db';
  */
 export async function GET(
   request: NextRequest,
-  { params }: { params: { questionId: string } }
+  { params }: { params: Promise<{ questionId: string }> }
 ) {
   try {
+    const resolvedParams = await params;
     const answers = await db.forumAnswer.findMany({
       where: {
-        questionId: params.questionId,
+        questionId: resolvedParams.questionId,
         isModerated: true,
       },
       orderBy: [
@@ -24,7 +25,7 @@ export async function GET(
 
     // Increment view count
     await db.forumQuestion.update({
-      where: { id: params.questionId },
+      where: { id: resolvedParams.questionId },
       data: { views: { increment: 1 } },
     });
 
@@ -44,9 +45,10 @@ export async function GET(
  */
 export async function POST(
   request: NextRequest,
-  { params }: { params: { questionId: string } }
+  { params }: { params: Promise<{ questionId: string }> }
 ) {
   try {
+    const resolvedParams = await params;
     const body = await request.json();
     const { authorEmail, content } = body;
 
@@ -59,7 +61,7 @@ export async function POST(
 
     // Verify question exists
     const question = await db.forumQuestion.findUnique({
-      where: { id: params.questionId },
+      where: { id: resolvedParams.questionId },
     });
 
     if (!question) {
@@ -71,7 +73,7 @@ export async function POST(
 
     const answer = await db.forumAnswer.create({
       data: {
-        questionId: params.questionId,
+        questionId: resolvedParams.questionId,
         authorEmail,
         content,
       },

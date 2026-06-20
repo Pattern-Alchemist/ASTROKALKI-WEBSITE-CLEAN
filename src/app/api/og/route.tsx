@@ -48,7 +48,7 @@ export const runtime = "nodejs";
 // applies to the ImageResponse path.
 export const revalidate = 86400;
 
-const SOCIAL_DIR = path.join(process.cwd(), "public", "social-images");
+const SOCIAL_DIR = path.join(/*turbopackIgnore: true*/ process.cwd(), "public", "social-images");
 
 // Pattern → big numeral (matches the homepage micro-reading UI)
 const PATTERN_NUMBERS: Record<string, { number: string; name: string }> = {

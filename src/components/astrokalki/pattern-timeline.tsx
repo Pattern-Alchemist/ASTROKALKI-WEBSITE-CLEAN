@@ -139,7 +139,7 @@ export function PatternTimeline({
       .attr('opacity', d => hoveredEvent === d.id ? 1 : 0.8)
       .style('cursor', 'pointer')
       .style('transition', 'all 0.2s ease')
-      .on('mouseover', function(event, d) {
+      .on('mouseover', function(this: any, event: any, d: any) {
         setHoveredEvent(d.id);
         d3.select(this)
           .transition()
@@ -147,7 +147,7 @@ export function PatternTimeline({
           .attr('r', 8)
           .attr('opacity', 1);
       })
-      .on('mouseout', function() {
+      .on('mouseout', function(this: any) {
         setHoveredEvent(null);
         d3.select(this)
           .transition()

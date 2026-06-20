@@ -78,11 +78,11 @@ export async function GET(_request: NextRequest) {
         kind: 'article',
         cluster: a.cluster,
         status: 'generated',
-        durationSec: row.duration,
+        durationSec: (row as any)?.duration,
         fileSizeBytes,
-        voice: row.voice,
-        createdAt: row.createdAt.toISOString(),
-        audioUrl: row.audioUrl,
+        voice: (row as any)?.voice,
+        createdAt: (row as any)?.createdAt?.toISOString(),
+        audioUrl: (row as any)?.audioUrl,
       });
     } else {
       items.push({
@@ -113,11 +113,11 @@ export async function GET(_request: NextRequest) {
         title: g.title,
         kind: 'guide',
         status: 'generated',
-        durationSec: row.duration,
+        durationSec: (row as any)?.duration,
         fileSizeBytes,
-        voice: row.voice,
-        createdAt: row.createdAt.toISOString(),
-        audioUrl: row.audioUrl,
+        voice: (row as any)?.voice,
+        createdAt: (row as any)?.createdAt?.toISOString(),
+        audioUrl: (row as any)?.audioUrl,
       });
     } else {
       items.push({
