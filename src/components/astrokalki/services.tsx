@@ -80,13 +80,15 @@ export default function Services() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-8">
                 <div>
                   <div className="w-16 h-16 mb-4 relative">
-                    <Image
-                      src={serviceKeys[0].icon}
-                      alt="Pattern Snapshot"
-                      fill
-                      className="object-contain"
-                      priority
-                    />
+                    {serviceKeys[0].icon && (
+                      <Image
+                        src={serviceKeys[0].icon}
+                        alt="Pattern Snapshot"
+                        fill
+                        className="object-contain"
+                        priority
+                      />
+                    )}
                   </div>
                   <h3 className="text-[#f0eee9] text-xl sm:text-2xl font-serif tracking-[-0.01em] mb-3 leading-tight">
                     {t(serviceKeys[0].titleKey)}

@@ -31,7 +31,7 @@ export function initializeSectionEngagement(): Map<SectionId, SectionEngagement>
   if (stored) {
     try {
       const data = JSON.parse(stored);
-      return new Map(Object.entries(data));
+      return new Map(Object.entries(data) as [SectionId, SectionEngagement][]);
     } catch {
       return getDefaultEngagement();
     }

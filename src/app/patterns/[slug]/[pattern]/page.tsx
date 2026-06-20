@@ -168,10 +168,15 @@ export default async function ProgrammaticCityPatternPage({
   // Try to fetch the DB record — admin may have edited it via /admin/seo.
   // DB slug is always {atlasSlug}-{citySlug} (NOT pillar-slug-based).
   const dbSlug = buildProgrammaticSlug(pattern.slug, city.slug);
-  const stored = await db.programmaticPage.findUnique({
-    where: { slug: dbSlug },
-    select: { content: true, searchQuery: true },
-  });
+  let stored: { content?: string; searchQuery?: string } | null = null;
+  try {
+    stored = await db.programmaticPage.findUnique({
+      where: { slug: dbSlug },
+      select: { content: true, searchQuery: true },
+    });
+  } catch {
+    // Database unavailable during build — fall through to generated content
+  }
 
   // DB content wins if it exists (admin edits respected). Otherwise use
   // the locally-generated body.
