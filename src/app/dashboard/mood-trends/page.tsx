@@ -13,7 +13,7 @@ import { db } from '@/lib/db';
 
 // Generate sample mood trend data
 function generateSampleMoodData() {
-  const data = [];
+  const data: Array<{ date: string; patterns: Record<string, number>; dominant: string }> = [];
   const today = new Date();
   
   for (let i = -30; i < 30; i++) {
