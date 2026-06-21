@@ -18,10 +18,11 @@
  *     no headers, no closing signature.
  */
 
-import type { JournalEntry } from '@prisma/client';
+import type { Prisma } from '@prisma/client';
 import { ATLAS_PATTERNS } from '@/lib/content/patterns/atlas';
 
 export type Mood = 'heavy' | 'numb' | 'anxious' | 'clear' | 'angry' | 'tender';
+type JournalEntry = Prisma.JournalEntryUncheckedCreateInput & { date: Date; id: string };
 
 const MOOD_LABEL: Record<Mood, string> = {
   heavy: 'heavy',
