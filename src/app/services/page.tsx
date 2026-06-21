@@ -43,32 +43,39 @@ export default function ServicesIndex() {
       <div className="max-w-4xl mx-auto px-6 sm:px-10 py-16 sm:py-20">
         <div className="space-y-6">
           {SERVICES.map((service, idx) => (
-            <Link
+            <div
               key={service.slug}
-              href={`/services/${service.slug}`}
-              className="block group p-8 sm:p-10 border border-white/[0.05] hover:border-[#c9a96e]/25 transition-colors"
+              className="group p-8 sm:p-10 border border-white/[0.05] hover:border-[#c9a96e]/25 transition-colors"
             >
-              <div className="flex items-start gap-6">
-                <span className="text-[#c9a96e]/50 font-mono text-xs pt-2 shrink-0">
-                  {String(idx + 1).padStart(2, "0")}
-                </span>
-                <div className="flex-1 min-w-0">
-                  <h2 className="text-2xl sm:text-3xl font-serif text-[#f0eee9] font-light tracking-[-0.01em] mb-3 group-hover:text-[#c9a96e] transition-colors">
-                    {service.title}
-                  </h2>
-                  <p className="text-base sm:text-lg text-[#cfcabf] font-serif italic font-light leading-[1.6] mb-5">
-                    {service.headline}
-                  </p>
-                  <div className="flex flex-wrap items-center gap-4 text-[10px] tracking-[0.3em] uppercase text-[#5a5a5a]">
-                    <span>{service.pricing[0]?.duration}</span>
-                    <span>·</span>
-                    <span>From {service.pricing[0]?.price}</span>
-                    <span>·</span>
-                    <span className="text-[#c9a96e]/70">{service.targetKeyword}</span>
+              <div className="flex items-start justify-between gap-6">
+                <div className="flex items-start gap-6 flex-1 min-w-0">
+                  <span className="text-[#c9a96e]/50 font-mono text-xs pt-2 shrink-0">
+                    {String(idx + 1).padStart(2, "0")}
+                  </span>
+                  <div className="flex-1 min-w-0">
+                    <h2 className="text-2xl sm:text-3xl font-serif text-[#f0eee9] font-light tracking-[-0.01em] mb-3 group-hover:text-[#c9a96e] transition-colors">
+                      {service.title}
+                    </h2>
+                    <p className="text-base sm:text-lg text-[#cfcabf] font-serif italic font-light leading-[1.6] mb-5">
+                      {service.headline}
+                    </p>
+                    <div className="flex flex-wrap items-center gap-4 text-[10px] tracking-[0.3em] uppercase text-[#5a5a5a]">
+                      <span>{service.pricing[0]?.duration}</span>
+                      <span>·</span>
+                      <span>From {service.pricing[0]?.price}</span>
+                      <span>·</span>
+                      <span className="text-[#c9a96e]/70">{service.targetKeyword}</span>
+                    </div>
                   </div>
                 </div>
+                <Link
+                  href={`/services/${service.slug}`}
+                  className="shrink-0 text-[10px] tracking-[0.3em] uppercase text-[#c9a96e] border-b border-[#c9a96e]/40 pb-1 hover:border-[#c9a96e] hover:text-[#f0eee9] transition-colors whitespace-nowrap mt-2"
+                >
+                  Learn more →
+                </Link>
               </div>
-            </Link>
+            </div>
           ))}
         </div>
 

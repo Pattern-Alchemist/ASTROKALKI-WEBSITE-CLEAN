@@ -183,8 +183,8 @@ export default function Hero() {
               className="mt-14 sm:mt-20"
             >
               <a
-                href="#micro-diagnosis"
-                aria-label={`${t("hero.cta1")} — begin the micro-reading diagnostic`}
+                href="#booking"
+                aria-label={`${t("hero.cta1")} — book a session`}
                 className="inline-flex items-center gap-4 text-[11px] tracking-[0.35em] uppercase text-[#f0eee9] border-b border-[#c9a96e]/50 pb-3 hover:border-[#c9a96e] hover:text-[#c9a96e] transition-colors duration-500 focus:outline-none focus-visible:ring-1 focus-visible:ring-[#c9a96e]/60 focus-visible:ring-offset-4 focus-visible:ring-offset-[#050505]"
               >
                 {t("hero.cta1")}

@@ -50,21 +50,29 @@ export default function Newsletter() {
             <form
               onSubmit={handleSubmit}
               className="max-w-md"
+              method="post"
             >
               <div className="flex gap-3 border-b border-white/[0.1] pb-3">
+                <label htmlFor="newsletter-email" className="sr-only">
+                  Email address
+                </label>
                 <input
+                  id="newsletter-email"
                   type="email"
+                  name="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="your@email.com"
                   required
+                  aria-label="Email address"
                   className="flex-1 bg-transparent text-sm text-[#f0eee9] focus:outline-none placeholder:text-[#3a3a3a] font-light"
                 />
                 <button
                   type="submit"
+                  name="subscribe"
                   className="text-[10px] tracking-[0.3em] uppercase text-[#c9a96e] hover:text-[#f0eee9] transition-colors duration-500 cursor-pointer whitespace-nowrap font-light"
                 >
-                  {t("newsletter.joinWhatsApp")} →
+                  Subscribe →
                 </button>
               </div>
             </form>

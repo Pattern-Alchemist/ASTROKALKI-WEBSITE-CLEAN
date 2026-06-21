@@ -5,9 +5,9 @@ import Link from "next/link";
 import { useI18n } from "@/lib/i18n-context";
 
 const insightKeys = [
-  { slug: "why-you-keep-going-back", categoryKey: "insights.article1.category", titleKey: "insights.article1.title", excerptKey: "insights.article1.excerpt", readTime: "7 min" },
-  { slug: "the-part-of-you-that-wants-you-to-fail", categoryKey: "insights.article2.category", titleKey: "insights.article2.title", excerptKey: "insights.article2.excerpt", readTime: "6 min" },
-  { slug: "you-didnt-choose-this-pain", categoryKey: "insights.article3.category", titleKey: "insights.article3.title", excerptKey: "insights.article3.excerpt", readTime: "8 min" },
+  { slug: "the-difference-between-love-and-trauma-bonding", categoryKey: "insights.article1.category", titleKey: "insights.article1.title", excerptKey: "insights.article1.excerpt", readTime: "7 min" },
+  { slug: "the-shadow-self", categoryKey: "insights.article2.category", titleKey: "insights.article2.title", excerptKey: "insights.article2.excerpt", readTime: "6 min" },
+  { slug: "the-trauma-loop", categoryKey: "insights.article3.category", titleKey: "insights.article3.title", excerptKey: "insights.article3.excerpt", readTime: "8 min" },
   { slug: "fear-of-being-seen", categoryKey: "insights.article4.category", titleKey: "insights.article4.title", excerptKey: "insights.article4.excerpt", readTime: "5 min" },
   { slug: "the-lie-you-tell-yourself", categoryKey: "insights.article5.category", titleKey: "insights.article5.title", excerptKey: "insights.article5.excerpt", readTime: "6 min" },
 ];
