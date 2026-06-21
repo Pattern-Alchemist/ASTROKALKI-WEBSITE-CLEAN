@@ -18,6 +18,7 @@ const navItemKeys = [
 const secondTierLinks = [
   { label: "Patterns", href: "/patterns/atlas" },
   { label: "Method", href: "/method" },
+  { label: "Pricing", href: "/pricing" },
   { label: "Research", href: "/research" },
   { label: "Guides", href: "/guides" },
   { label: "Services", href: "/services" },
