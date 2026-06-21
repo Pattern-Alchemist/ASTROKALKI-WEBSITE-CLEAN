@@ -141,6 +141,13 @@ export default function ReferPage() {
               How it works
               <span>↓</span>
             </Link>
+            <Link
+              href="/#booking"
+              className="inline-flex items-center gap-3 text-[11px] tracking-[0.3em] uppercase text-[#7a7a7a] border-b border-white/[0.1] pb-3 hover:border-[#c9a96e]/50 hover:text-[#f0eee9] transition-colors duration-500"
+            >
+              Book a session
+              <span>→</span>
+            </Link>
           </div>
         </div>
       </header>
@@ -260,13 +267,22 @@ export default function ReferPage() {
             <p className="text-base text-[#9a9a9a] font-light leading-[1.8] mb-6 max-w-md mx-auto">
               Ready when you are. The form is above.
             </p>
-            <Link
-              href="#generate"
-              className="inline-flex items-center gap-3 text-[11px] tracking-[0.3em] uppercase text-[#c9a96e] border-b border-[#c9a96e]/40 pb-2 hover:border-[#c9a96e] hover:text-[#f0eee9] transition-colors duration-500"
-            >
-              Back to the form
-              <span>↑</span>
-            </Link>
+            <div className="flex flex-wrap gap-4 justify-center">
+              <Link
+                href="#generate"
+                className="inline-flex items-center gap-3 text-[11px] tracking-[0.3em] uppercase text-[#c9a96e] border-b border-[#c9a96e]/40 pb-2 hover:border-[#c9a96e] hover:text-[#f0eee9] transition-colors duration-500"
+              >
+                Back to the form
+                <span>↑</span>
+              </Link>
+              <Link
+                href="/pricing"
+                className="inline-flex items-center gap-3 text-[11px] tracking-[0.3em] uppercase text-[#7a7a7a] border-b border-white/[0.1] pb-2 hover:border-[#c9a96e]/50 hover:text-[#f0eee9] transition-colors duration-500"
+              >
+                View pricing
+                <span>→</span>
+              </Link>
+            </div>
           </div>
         </div>
       </section>

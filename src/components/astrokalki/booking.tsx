@@ -314,19 +314,25 @@ export default function Booking() {
         {/* Steps 1-5 */}
         {step > 0 && step < 6 && (
           <>
-            {/* Minimal progress indicator — 5 steps */}
+            {/* Enhanced progress indicator — 5 steps with visual feedback */}
             <div className="mb-16" role="navigation" aria-label="Booking progress">
               <div className="flex items-center justify-between mb-3 text-[10px] tracking-[0.3em] uppercase font-mono font-light">
                 {STEPS.map((s, i) => (
                   <div key={s.id} className={`flex items-center gap-3 ${i < STEPS.length - 1 ? "flex-1" : ""}`}>
                     <span
                       aria-current={s.id === step ? "step" : undefined}
-                      className={s.id <= step ? "text-[#c9a96e]" : "text-[#3a3a3a]"}
+                      className={`transition-all duration-300 ${
+                        s.id < step 
+                          ? "text-[#c9a96e] opacity-100" 
+                          : s.id === step 
+                          ? "text-[#c9a96e] font-medium scale-110" 
+                          : "text-[#3a3a3a] opacity-60"
+                      }`}
                     >
                       {String(s.id).padStart(2, "0")}
                     </span>
                     {i < STEPS.length - 1 && (
-                      <div className={`flex-1 h-px ${s.id < step ? "bg-[#c9a96e]/40" : "bg-white/[0.06]"}`} />
+                      <div className={`flex-1 h-px transition-colors duration-500 ${s.id < step ? "bg-[#c9a96e]" : "bg-white/[0.06]"}`} />
                     )}
                   </div>
                 ))}
@@ -336,8 +342,8 @@ export default function Booking() {
                   <span
                     key={s.id}
                     aria-current={s.id === step ? "step" : undefined}
-                    className={`text-center flex-1 first:text-left last:text-right ${
-                      s.id === step ? "text-[#c9a96e]" : ""
+                    className={`text-center flex-1 first:text-left last:text-right transition-colors duration-300 ${
+                      s.id === step ? "text-[#c9a96e] font-medium" : s.id < step ? "text-[#c9a96e]/70" : "text-[#5a5a5a]"
                     }`}
                   >
                     {t(s.labelKey)}
@@ -837,14 +843,14 @@ export default function Booking() {
               <div className="flex items-center justify-between mt-12 pt-6 border-t border-white/[0.06]">
                 <button
                   onClick={handleBack}
-                  className="text-[10px] tracking-[0.3em] uppercase text-[#7a7a7a] hover:text-[#f0eee9] transition-colors duration-500 cursor-pointer font-light"
+                  className="text-[10px] tracking-[0.3em] uppercase text-[#7a7a7a] hover:text-[#f0eee9] hover:border-[#c9a96e]/30 border-b border-transparent transition-all duration-300 cursor-pointer font-light pb-1"
                 >
                   ← {t("booking.back")}
                 </button>
                 <button
                   onClick={handleNext}
                   disabled={!canProceed()}
-                  className="text-[10px] tracking-[0.3em] uppercase text-[#c9a96e] disabled:opacity-25 disabled:cursor-not-allowed cursor-pointer hover:text-[#f0eee9] transition-colors font-light"
+                  className="text-[10px] tracking-[0.3em] uppercase text-[#c9a96e] border-b border-[#c9a96e]/30 disabled:opacity-30 disabled:cursor-not-allowed disabled:border-[#3a3a3a] cursor-pointer hover:border-[#c9a96e] hover:text-[#f0eee9] hover:bg-[#c9a96e]/5 transition-all duration-300 font-light pb-2 px-2"
                 >
                   {t("booking.continueBtn")} →
                 </button>
